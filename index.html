@@ -1,0 +1,515 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简共享相册</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding-bottom: 80px;
+        }
+        .header {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #f0f0f0;
+            transition: all 0.3s;
+        }
+        .tab.active {
+            background: #2196F3;
+            color: white;
+        }
+        .admin-area {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .admin-area input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+        }
+        .admin-area button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #ff9800;
+            color: white;
+            cursor: pointer;
+        }
+        .upload-area {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            margin: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .upload-btn:hover {
+            background: #43a047;
+        }
+        #file-input {
+            display: none;
+        }
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            padding: 0 16px;
+        }
+        .image-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        .image-card img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            cursor: pointer;
+        }
+        .image-info {
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .like-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            color: #666;
+            border: none;
+            background: none;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .like-btn:hover {
+            background: #f0f0f0;
+        }
+        .like-btn.liked {
+            color: #e91e63;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .delete-btn.show {
+            display: flex;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        .modal .close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 300;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="tabs">
+            <div class="tab active" data-tab="home">最新上传</div>
+            <div class="tab" data-tab="ranking">点赞排行榜</div>
+        </div>
+        <div class="admin-area">
+            <input type="password" id="admin-pwd" placeholder="管理员密码（仅你用）">
+            <button onclick="adminLogin()">进入管理</button>
+        </div>
+    </div>
+
+    <div class="upload-area">
+        <label class="upload-btn">
+            📷 上传图片
+            <input type="file" id="file-input" multiple accept="image/*">
+        </label>
+    </div>
+
+    <div id="home-panel">
+        <div class="images-grid" id="home-images"></div>
+    </div>
+
+    <div id="ranking-panel" style="display: none;">
+        <div class="images-grid" id="ranking-images"></div>
+    </div>
+
+    <div class="modal" id="image-modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img id="modal-img" src="">
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ======================================
+        // 👇 你需要自己配置的部分，按下面的说明填好就能用
+        // ======================================
+        const SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
+        const ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe"; // 管理员密码
+        const STORAGE_BUCKET = "images"; // 存储桶名字，默认images就行
+
+        // 用户唯一标识（本地生成，用来防重复点赞、判断自己的图片）
+        let userId = localStorage.getItem('userId');
+        if (!userId) {
+            userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('userId', userId);
+        }
+
+        // 已点赞的图片ID
+        let likedIds = JSON.parse(localStorage.getItem('likedIds') || '[]');
+        // 是否是管理员
+        let isAdmin = localStorage.getItem('isAdmin') === 'true';
+
+        // 初始化Supabase
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 页面加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab切换
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    const tabName = this.dataset.tab;
+                    if (tabName === 'home') {
+                        document.getElementById('home-panel').style.display = 'block';
+                        document.getElementById('ranking-panel').style.display = 'none';
+                    } else {
+                        document.getElementById('home-panel').style.display = 'none';
+                        document.getElementById('ranking-panel').style.display = 'block';
+                        loadRanking();
+                    }
+                });
+            });
+
+            // 文件上传
+            document.getElementById('file-input').addEventListener('change', uploadFiles);
+
+            // 模态框关闭
+            document.getElementById('image-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+
+            // 加载首页图片
+            loadImages();
+
+            // 如果已经是管理员，更新状态
+            if (isAdmin) {
+                showToast('已进入管理模式');
+            }
+        });
+
+        // 加载首页（时间排序）
+        async function loadImages() {
+            const container = document.getElementById('home-images');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+
+            try {
+                const { data, error } = await supabase
+                    .from('images')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                renderImages(data, container);
+            } catch (e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            }
+        }
+
+        // 加载排行榜（点赞排序）
+        async function loadRanking() {
+            const container = document.getElementById('ranking-images');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+
+            try {
+                const { data, error } = await supabase
+                    .from('images')
+                    .select('*')
+                    .order('like_count', { ascending: false });
+
+                if (error) throw error;
+                renderImages(data, container);
+            } catch (e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            }
+        }
+
+        // 渲染图片列表
+        function renderImages(images, container) {
+            if (images.length === 0) {
+                container.innerHTML = '<div class="loading">还没有图片，快来上传第一张吧~</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            images.forEach(img => {
+                const id = img.id;
+                const url = img.url;
+                const likeCount = img.like_count || 0;
+                const uploaderId = img.uploader_id;
+                const isLiked = likedIds.includes(id);
+                const canDelete = isAdmin || uploaderId === userId;
+
+                const card = document.createElement('div');
+                card.className = 'image-card';
+                card.innerHTML = `
+                    <img src="${url}" alt="图片" onclick="openModal('${url}')">
+                    <button class="delete-btn ${canDelete ? 'show' : ''}" onclick="deleteImage('${id}', '${url}')">&times;</button>
+                    <div class="image-info">
+                        <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="likeImage('${id}', this)">
+                            ❤️ ${likeCount}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 上传文件
+        async function uploadFiles(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+
+            showToast('正在上传...');
+
+            for (let file of files) {
+                try {
+                    // 生成唯一文件名，防止重名
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
+                    
+                    // 上传到Supabase存储
+                    const { data: uploadData, error: uploadError } = await supabase
+                        .storage
+                        .from(STORAGE_BUCKET)
+                        .upload(fileName, file);
+
+                    if (uploadError) throw uploadError;
+
+                    // 获取公共访问URL
+                    const { data: { publicUrl } } = supabase
+                        .storage
+                        .from(STORAGE_BUCKET)
+                        .getPublicUrl(fileName);
+
+                    // 插入数据库记录
+                    const { error: insertError } = await supabase
+                        .from('images')
+                        .insert([
+                            {
+                                url: publicUrl,
+                                uploader_id: userId,
+                                like_count: 0
+                            }
+                        ]);
+
+                    if (insertError) throw insertError;
+
+                } catch (err) {
+                    showToast('上传失败: ' + err.message);
+                    return;
+                }
+            }
+
+            showToast('上传成功！');
+            loadImages();
+            // 清空input
+            document.getElementById('file-input').value = '';
+        }
+
+        // 点赞
+        async function likeImage(imageId, btn) {
+            if (likedIds.includes(imageId)) {
+                showToast('你已经点过赞啦');
+                return;
+            }
+
+            try {
+                // 先获取当前点赞数
+                const { data: img, error: getError } = await supabase
+                    .from('images')
+                    .select('like_count')
+                    .eq('id', imageId)
+                    .single();
+
+                if (getError) throw getError;
+
+                // 更新点赞数
+                const { error: updateError } = await supabase
+                    .from('images')
+                    .update({ like_count: img.like_count + 1 })
+                    .eq('id', imageId);
+
+                if (updateError) throw updateError;
+
+                // 本地记录已点赞
+                likedIds.push(imageId);
+                localStorage.setItem('likedIds', JSON.stringify(likedIds));
+
+                // 更新UI
+                btn.classList.add('liked');
+                btn.innerText = '❤️ ' + (img.like_count + 1);
+
+                showToast('点赞成功！');
+            } catch (e) {
+                showToast('点赞失败: ' + e.message);
+            }
+        }
+
+        // 删除图片
+        async function deleteImage(imageId, url) {
+            if (!confirm('确定要删除这张图片吗？')) return;
+
+            try {
+                // 从URL里提取文件名
+                const fileName = url.split('/').pop();
+
+                // 删除存储里的文件
+                const { error: storageError } = await supabase
+                    .storage
+                    .from(STORAGE_BUCKET)
+                    .remove([fileName]);
+
+                if (storageError) console.warn('文件删除警告:', storageError);
+
+                // 删除数据库记录
+                const { error: dbError } = await supabase
+                    .from('images')
+                    .delete()
+                    .eq('id', imageId);
+
+                if (dbError) throw dbError;
+
+                showToast('删除成功！');
+                loadImages();
+                loadRanking();
+            } catch (e) {
+                showToast('删除失败: ' + e.message);
+            }
+        }
+
+        // 管理员登录
+        function adminLogin() {
+            const pwd = document.getElementById('admin-pwd').value;
+            if (pwd === ADMIN_PASSWORD) {
+                isAdmin = true;
+                localStorage.setItem('isAdmin', 'true');
+                showToast('管理员登录成功，你可以删除任意图片了');
+                loadImages();
+            } else {
+                showToast('密码错误');
+            }
+        }
+
+        // 打开大图
+        function openModal(url) {
+            document.getElementById('modal-img').src = url;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        // 关闭大图
+        function closeModal() {
+            document.getElementById('image-modal').style.display = 'none';
+        }
+
+        // Toast提示
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
