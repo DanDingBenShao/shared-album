@@ -250,7 +250,7 @@
         let isAdmin = localStorage.getItem('isAdmin') === 'true';
 
         // 初始化Supabase
-        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 页面加载完成
         document.addEventListener('DOMContentLoaded', function() {
@@ -294,7 +294,7 @@
             container.innerHTML = '<div class="loading">加载中...</div>';
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('images')
                     .select('*')
                     .order('created_at', { ascending: false });
@@ -312,7 +312,7 @@
             container.innerHTML = '<div class="loading">加载中...</div>';
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('images')
                     .select('*')
                     .order('like_count', { ascending: false });
@@ -368,7 +368,7 @@
                     const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
                     
                     // 上传到Supabase存储
-                    const { data: uploadData, error: uploadError } = await supabase
+                    const { data: uploadData, error: uploadError } = await supabaseClient
                         .storage
                         .from(STORAGE_BUCKET)
                         .upload(fileName, file);
@@ -376,13 +376,13 @@
                     if (uploadError) throw uploadError;
 
                     // 获取公共访问URL
-                    const { data: { publicUrl } } = supabase
+                    const { data: { publicUrl } } = supabaseClient
                         .storage
                         .from(STORAGE_BUCKET)
                         .getPublicUrl(fileName);
 
                     // 插入数据库记录
-                    const { error: insertError } = await supabase
+                    const { error: insertError } = await supabaseClient
                         .from('images')
                         .insert([
                             {
@@ -415,7 +415,7 @@
 
             try {
                 // 先获取当前点赞数
-                const { data: img, error: getError } = await supabase
+                const { data: img, error: getError } = await supabaseClient
                     .from('images')
                     .select('like_count')
                     .eq('id', imageId)
@@ -424,7 +424,7 @@
                 if (getError) throw getError;
 
                 // 更新点赞数
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseClient
                     .from('images')
                     .update({ like_count: img.like_count + 1 })
                     .eq('id', imageId);
@@ -454,7 +454,7 @@
                 const fileName = url.split('/').pop();
 
                 // 删除存储里的文件
-                const { error: storageError } = await supabase
+                const { error: storageError } = await supabaseClient
                     .storage
                     .from(STORAGE_BUCKET)
                     .remove([fileName]);
@@ -462,7 +462,7 @@
                 if (storageError) console.warn('文件删除警告:', storageError);
 
                 // 删除数据库记录
-                const { error: dbError } = await supabase
+                const { error: dbError } = await supabaseClient
                     .from('images')
                     .delete()
                     .eq('id', imageId);
