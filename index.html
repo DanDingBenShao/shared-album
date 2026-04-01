@@ -326,6 +326,20 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         .whitelist-current .wl-item:last-child { border-bottom: none; }
 
         /* ===== 用户登录/注册弹窗 ===== */
+        .auth-welcome-tip {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .auth-welcome-tip .tip-icon { font-size: 20px; }
+        .auth-welcome-tip .tip-text { flex: 1; }
         .auth-tabs { display: flex; margin-bottom: 16px; border-bottom: 1px solid #eee; }
         .auth-tab {
             flex: 1; padding: 10px; text-align: center; cursor: pointer;
@@ -697,6 +711,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     <!-- 用户登录/注册弹窗 -->
     <div class="modal-overlay" id="auth-modal">
         <div class="modal-panel">
+            <div class="auth-welcome-tip" id="auth-welcome-tip">
+                <span class="tip-icon">&#128075;</span>
+                <span class="tip-text">欢迎！登录后可上传图片、点赞收藏、获得更多浏览额度</span>
+            </div>
             <div class="auth-tabs">
                 <div class="auth-tab active" data-auth="login" onclick="switchAuthTab('login')">登录</div>
                 <div class="auth-tab" data-auth="register" onclick="switchAuthTab('register')">注册</div>
@@ -1167,9 +1185,18 @@ function setupLazyLoad() {
                         var check = checkBandwidthLimit(50 * 1024);
                         if (!check.allowed) {
                             // 带宽不足，显示占位图
-                            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足</text></svg>';
+                            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
                             img.style.opacity = '0.5';
+                            img.style.cursor = 'pointer';
+                            img.onclick = function() { 
+                                showToast('浏览额度已用完，请登录后继续');
+                                setTimeout(function() { openAuthModal(); }, 500);
+                            };
                             lazyObserver.unobserve(img);
+                            // 更新带宽显示
+                            if (typeof updateBandwidthDisplay === 'function') {
+                                updateBandwidthDisplay();
+                            }
                             return;
                         }
                         
@@ -1196,8 +1223,16 @@ function lazyLoadImage(imgEl, src, imageId) {
         // 不支持 IntersectionObserver，直接加载前检查带宽
         var check = checkBandwidthLimit(50 * 1024);
         if (!check.allowed) {
-            imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足</text></svg>';
+            imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
             imgEl.style.opacity = '0.5';
+            imgEl.style.cursor = 'pointer';
+            imgEl.onclick = function() { 
+                showToast('浏览额度已用完，请登录后继续');
+                setTimeout(function() { openAuthModal(); }, 500);
+            };
+            if (typeof updateBandwidthDisplay === 'function') {
+                updateBandwidthDisplay();
+            }
             return;
         }
         var userId = currentUser ? currentUser.id : null;
@@ -1811,12 +1846,12 @@ var pendingAlbumCover = null;
 function checkUploadPermission() {
     if (isAdmin) return true;
     if (!currentUser) {
-        showToast('请先登录');
-        openAuthModal();
+        showToast('登录后可上传图片');
+        setTimeout(function() { openAuthModal(); }, 500);
         return false;
     }
     if (!isWhitelisted) {
-        showToast('你不在白名单中，无法上传');
+        showToast('你不在白名单中，无法上传。请联系管理员添加白名单');
         return false;
     }
     return true;
@@ -2419,8 +2454,15 @@ var currentSearchQuery = '';
 
 function initSearch() {
     // 搜索类型切换
-    document.querySelectorAll('.search-type-tab').forEach(function(tab) {
-        tab.onclick = function() {
+    var searchTypeTabs = document.querySelectorAll('.search-type-tab');
+    if (searchTypeTabs.length === 0) {
+        console.warn('initSearch: 未找到 .search-type-tab 元素');
+        return;
+    }
+    
+    searchTypeTabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            console.log('搜索类型切换:', tab.dataset.searchType);
             document.querySelectorAll('.search-type-tab').forEach(function(t) {
                 t.classList.remove('active');
             });
@@ -2428,7 +2470,7 @@ function initSearch() {
             currentSearchType = tab.dataset.searchType;
             updateSearchPlaceholder();
             updateSearchFilters();
-        };
+        });
     });
     
     // 搜索输入框回车事件
@@ -3000,6 +3042,13 @@ function formatTime(timestamp) {
 // 点赞
 // ======================================
 function likeImage(imageId, btn) {
+    // 检查是否已登录
+    if (!currentUser) {
+        showToast('登录后可点赞，正在跳转登录...');
+        setTimeout(function() { openAuthModal(); }, 800);
+        return;
+    }
+    
     if (likedIds.indexOf(imageId) !== -1) {
         showToast('你已经点过赞啦');
         return;
@@ -3307,6 +3356,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 更新带宽显示
     updateBandwidthDisplay();
+    
+    // 检查并提示带宽即将用尽（游客模式）
+    checkAndWarnLowBandwidth();
 
     // 设置无限滚动
     setupInfiniteScroll();
@@ -3358,6 +3410,10 @@ function confirmDisclaimer() {
 
 function setupDragDrop(dropId, type) {
     var dz = document.getElementById(dropId);
+    if (!dz) {
+        console.warn('setupDragDrop: 未找到元素 #' + dropId);
+        return;
+    }
     dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
     dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
     dz.addEventListener('drop', function(e) {
@@ -3405,25 +3461,80 @@ function updateBandwidthDisplay() {
     var userId = currentUser ? currentUser.id : null;
     var usage = getBandwidthUsage(userId);
     var used = usage.upload + usage.download;
+    var remaining = limit - used;
     
     if (userType === 'admin') {
         badge.textContent = '带宽：无限制';
         badge.style.display = 'inline-block';
         badge.style.background = '#4CAF50';
+        badge.title = '管理员无带宽限制';
         return;
     }
     
     var percent = (used / limit * 100).toFixed(0);
-    badge.textContent = '带宽：' + formatBytes(used) + ' / ' + formatBytes(limit) + ' (' + percent + '%)';
-    badge.style.display = 'inline-block';
     
-    // 根据使用率改变颜色
-    if (percent >= 90) {
-        badge.style.background = '#f44336'; // 红色警告
-    } else if (percent >= 70) {
-        badge.style.background = '#ff9800'; // 橙色提醒
+    // 游客模式：显示剩余额度，更友好
+    if (userType === 'guest') {
+        badge.textContent = '剩余：' + formatBytes(remaining);
+        badge.title = '游客每日可浏览 5MB，登录后可获得 100MB 额度';
+        badge.style.display = 'inline-block';
+        
+        // 游客模式颜色：根据剩余额度
+        if (remaining < 500 * 1024) { // 少于500KB
+            badge.style.background = '#f44336'; // 红色警告
+            badge.textContent = '额度不足！';
+        } else if (remaining < 2 * 1024 * 1024) { // 少于2MB
+            badge.style.background = '#ff9800'; // 橙色提醒
+        } else {
+            badge.style.background = '#2196F3'; // 蓝色正常
+        }
     } else {
-        badge.style.background = '#2196F3'; // 蓝色正常
+        // 登录用户：显示已用/总额
+        badge.textContent = '已用：' + formatBytes(used) + ' / ' + formatBytes(limit);
+        badge.title = '今日已使用 ' + percent + '%，额度每日 0 点重置';
+        badge.style.display = 'inline-block';
+        
+        // 根据使用率改变颜色
+        if (percent >= 90) {
+            badge.style.background = '#f44336'; // 红色警告
+        } else if (percent >= 70) {
+            badge.style.background = '#ff9800'; // 橙色提醒
+        } else {
+            badge.style.background = '#2196F3'; // 蓝色正常
+        }
+    }
+}
+
+// ======================================
+// 检查并提示带宽即将用尽（游客模式）
+// ======================================
+function checkAndWarnLowBandwidth() {
+    var userType = defineCurrentUserType();
+    if (userType !== 'guest') return;
+    
+    var limit = getBandwidthLimit(userType);
+    var userId = currentUser ? currentUser.id : null;
+    var usage = getBandwidthUsage(userId);
+    var used = usage.upload + usage.download;
+    var remaining = limit - used;
+    var percent = (used / limit * 100);
+    
+    // 首次低于 50% 时提示
+    var warnedKey = 'bw_warned_' + getTodayKey();
+    var hasWarned = safeGet(warnedKey, '') === 'true';
+    
+    if (percent >= 50 && percent < 80 && !hasWarned) {
+        showToast('已使用 50% 浏览额度，登录可获得更多额度');
+        safeSet(warnedKey, 'true');
+    }
+    
+    // 低于 20% 时再次提示
+    var warnedLowKey = 'bw_warned_low_' + getTodayKey();
+    var hasWarnedLow = safeGet(warnedLowKey, '') === 'true';
+    
+    if (percent >= 80 && !hasWarnedLow) {
+        showToast('浏览额度即将用尽，建议立即登录');
+        safeSet(warnedLowKey, 'true');
     }
 }
 
