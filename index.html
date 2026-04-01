@@ -612,8 +612,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     <!-- 搜索栏 -->
     <div class="search-bar">
         <div class="search-type-tabs">
-            <div class="search-type-tab active" data-search-type="tag">标签</div>
-            <div class="search-type-tab" data-search-type="author">作者</div>
+            <div class="search-type-tab active" data-search-type="tag" onclick="switchSearchType('tag', this)">标签</div>
+            <div class="search-type-tab" data-search-type="author" onclick="switchSearchType('author', this)">作者</div>
         </div>
         <div class="search-input-row">
             <input type="text" id="search-input" placeholder="搜索标签，如：风景 人物">
@@ -2452,26 +2452,35 @@ function confirmAlbumUpload() {
 var currentSearchType = 'tag'; // 'tag' 或 'author'
 var currentSearchQuery = '';
 
+function switchSearchType(type, element) {
+    console.log('switchSearchType 被调用:', type);
+    currentSearchType = type;
+    document.querySelectorAll('.search-type-tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    if (element) {
+        element.classList.add('active');
+    } else {
+        document.querySelector('.search-type-tab[data-search-type="' + type + '"]').classList.add('active');
+    }
+    updateSearchPlaceholder();
+    updateSearchFilters();
+    console.log('切换完成，currentSearchType:', currentSearchType);
+}
+
 function initSearch() {
-    // 搜索类型切换
+    console.log('initSearch 开始执行');
+    // 搜索类型切换 - 使用内联 onclick，这里只做初始化
     var searchTypeTabs = document.querySelectorAll('.search-type-tab');
+    console.log('找到 .search-type-tab 元素数量:', searchTypeTabs.length);
     if (searchTypeTabs.length === 0) {
         console.warn('initSearch: 未找到 .search-type-tab 元素');
         return;
     }
     
-    searchTypeTabs.forEach(function(tab) {
-        tab.addEventListener('click', function() {
-            console.log('搜索类型切换:', tab.dataset.searchType);
-            document.querySelectorAll('.search-type-tab').forEach(function(t) {
-                t.classList.remove('active');
-            });
-            tab.classList.add('active');
-            currentSearchType = tab.dataset.searchType;
-            updateSearchPlaceholder();
-            updateSearchFilters();
-        });
-    });
+    // 确保初始状态正确
+    updateSearchPlaceholder();
+    updateSearchFilters();
     
     // 搜索输入框回车事件
     var searchInput = document.getElementById('search-input');
@@ -3317,12 +3326,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 文件选择
-    document.getElementById('file-input-image').addEventListener('change', function(e) {
-        handleFileSelect(e.target.files, 'image');
-    });
-    document.getElementById('file-input-album-cover').addEventListener('change', function(e) {
-        handleFileSelect(e.target.files, 'cover');
-    });
+    var fileInputImage = document.getElementById('file-input-image');
+    if (fileInputImage) {
+        fileInputImage.addEventListener('change', function(e) {
+            handleFileSelect(e.target.files, 'image');
+        });
+    }
+    var fileInputAlbumCover = document.getElementById('file-input-album-cover');
+    if (fileInputAlbumCover) {
+        fileInputAlbumCover.addEventListener('change', function(e) {
+            handleFileSelect(e.target.files, 'cover');
+        });
+    }
 
     // 拖拽上传
     setupDragDrop('upload-drop', 'image');
