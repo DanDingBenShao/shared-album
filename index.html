@@ -283,7 +283,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         let isAdmin = safeGet('isAdmin', 'false') === 'true';
 
         // 初始化Supabase
-        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 页面加载完成
         document.addEventListener('DOMContentLoaded', function() {
