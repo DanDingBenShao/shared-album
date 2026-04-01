@@ -237,17 +237,25 @@
         const ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe"; // 管理员密码
         const STORAGE_BUCKET = "images"; // 存储桶名字，默认images就行
 
+        // 安全读写 localStorage（兼容 Edge Tracking Prevention）
+        function safeGet(key, fallback) {
+            try { return localStorage.getItem(key) || fallback; } catch(e) { return fallback; }
+        }
+        function safeSet(key, val) {
+            try { localStorage.setItem(key, val); } catch(e) {}
+        }
+
         // 用户唯一标识（本地生成，用来防重复点赞、判断自己的图片）
-        let userId = localStorage.getItem('userId');
+        let userId = safeGet('userId', null);
         if (!userId) {
             userId = 'user_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('userId', userId);
+            safeSet('userId', userId);
         }
 
         // 已点赞的图片ID
-        let likedIds = JSON.parse(localStorage.getItem('likedIds') || '[]');
+        let likedIds = JSON.parse(safeGet('likedIds', '[]'));
         // 是否是管理员
-        let isAdmin = localStorage.getItem('isAdmin') === 'true';
+        let isAdmin = safeGet('isAdmin', 'false') === 'true';
 
         // 初始化Supabase
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -433,7 +441,7 @@
 
                 // 本地记录已点赞
                 likedIds.push(imageId);
-                localStorage.setItem('likedIds', JSON.stringify(likedIds));
+                safeSet('likedIds', JSON.stringify(likedIds));
 
                 // 更新UI
                 btn.classList.add('liked');
@@ -482,7 +490,7 @@
             const pwd = document.getElementById('admin-pwd').value;
             if (pwd === ADMIN_PASSWORD) {
                 isAdmin = true;
-                localStorage.setItem('isAdmin', 'true');
+                safeSet('isAdmin', 'true');
                 showToast('管理员登录成功，你可以删除任意图片了');
                 loadImages();
             } else {
