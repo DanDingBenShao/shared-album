@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -32,516 +31,1465 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 `);let e=await s.signMessage(new TextEncoder().encode(t),`utf8`);if(!e||!(e instanceof Uint8Array))throw Error(`@supabase/auth-js: Wallet signMessage() API returned an recognized value`);n=e}}try{let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=web3`,{headers:this.headers,body:Object.assign({chain:`solana`,message:t,signature:B(n)},e.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options?.captchaToken}}:null),xform:X});if(i)throw i;if(!r||!r.session||!r.user){let e=new R;return this._returnResult({data:{user:null,session:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign({},r),error:i})}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _exchangeCodeForSession(e){let[t,n]=(await W(this.storage,`${this.storageKey}-code-verifier`)??``).split(`/`);try{if(!t&&this.flowType===`pkce`)throw new hn;let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=pkce`,{headers:this.headers,body:{auth_code:e,code_verifier:t},xform:X});if(await G(this.storage,`${this.storageKey}-code-verifier`),i)throw i;if(!r||!r.session||!r.user){let e=new R;return this._returnResult({data:{user:null,session:null,redirectType:null},error:e})}return r.session&&(await this._saveSession(r.session),await this._notifyAllSubscribers(`SIGNED_IN`,r.session)),this._returnResult({data:Object.assign(Object.assign({},r),{redirectType:n??null}),error:i})}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:{user:null,session:null,redirectType:null},error:e});throw e}}async signInWithIdToken(e){try{let{options:t,provider:n,token:r,access_token:i,nonce:a}=e,{data:o,error:s}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,body:{provider:n,id_token:r,access_token:i,nonce:a,gotrue_meta_security:{captcha_token:t?.captchaToken}},xform:X});if(s)return this._returnResult({data:{user:null,session:null},error:s});if(!o||!o.session||!o.user){let e=new R;return this._returnResult({data:{user:null,session:null},error:e})}return o.session&&(await this._saveSession(o.session),await this._notifyAllSubscribers(`SIGNED_IN`,o.session)),this._returnResult({data:o,error:s})}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithOtp(e){try{if(`email`in e){let{email:t,options:n}=e,r=null,i=null;this.flowType===`pkce`&&([r,i]=await K(this.storage,this.storageKey));let{error:a}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{email:t,data:n?.data??{},create_user:n?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:n?.captchaToken},code_challenge:r,code_challenge_method:i},redirectTo:n?.emailRedirectTo});return this._returnResult({data:{user:null,session:null},error:a})}if(`phone`in e){let{phone:t,options:n}=e,{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/otp`,{headers:this.headers,body:{phone:t,data:n?.data??{},create_user:n?.shouldCreateUser??!0,gotrue_meta_security:{captcha_token:n?.captchaToken},channel:n?.channel??`sms`}});return this._returnResult({data:{user:null,session:null,messageId:r?.message_id},error:i})}throw new dn(`You must provide either an email or phone number.`)}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async verifyOtp(e){try{let t,n;`options`in e&&(t=e.options?.redirectTo,n=e.options?.captchaToken);let{data:r,error:i}=await Y(this.fetch,`POST`,`${this.url}/verify`,{headers:this.headers,body:Object.assign(Object.assign({},e),{gotrue_meta_security:{captcha_token:n}}),redirectTo:t,xform:X});if(i)throw i;if(!r)throw Error(`An error occurred on token verification.`);let a=r.session,o=r.user;return a?.access_token&&(await this._saveSession(a),await this._notifyAllSubscribers(e.type==`recovery`?`PASSWORD_RECOVERY`:`SIGNED_IN`,a)),this._returnResult({data:{user:o,session:a},error:null})}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async signInWithSSO(e){try{let t=null,n=null;this.flowType===`pkce`&&([t,n]=await K(this.storage,this.storageKey));let r=await Y(this.fetch,`POST`,`${this.url}/sso`,{body:Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({},`providerId`in e?{provider_id:e.providerId}:null),`domain`in e?{domain:e.domain}:null),{redirect_to:e.options?.redirectTo??void 0}),e?.options?.captchaToken?{gotrue_meta_security:{captcha_token:e.options.captchaToken}}:null),{skip_http_redirect:!0,code_challenge:t,code_challenge_method:n}),headers:this.headers,xform:ar});return r.data?.url&&V()&&!e.options?.skipBrowserRedirect&&window.location.assign(r.data.url),this._returnResult(r)}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:null,error:e});throw e}}async reauthenticate(){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>await this._reauthenticate())}async _reauthenticate(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;if(n)throw n;if(!t)throw new L;let{error:r}=await Y(this.fetch,`GET`,`${this.url}/reauthenticate`,{headers:this.headers,jwt:t.access_token});return this._returnResult({data:{user:null,session:null},error:r})})}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async resend(e){try{let t=`${this.url}/resend`;if(`email`in e){let{email:n,type:r,options:i}=e,{error:a}=await Y(this.fetch,`POST`,t,{headers:this.headers,body:{email:n,type:r,gotrue_meta_security:{captcha_token:i?.captchaToken}},redirectTo:i?.emailRedirectTo});return this._returnResult({data:{user:null,session:null},error:a})}else if(`phone`in e){let{phone:n,type:r,options:i}=e,{data:a,error:o}=await Y(this.fetch,`POST`,t,{headers:this.headers,body:{phone:n,type:r,gotrue_meta_security:{captcha_token:i?.captchaToken}}});return this._returnResult({data:{user:null,session:null,messageId:a?.message_id},error:o})}throw new dn(`You must provide either an email or phone number and a type`)}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async getSession(){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>this._useSession(async e=>e))}async _acquireLock(e,t){this._debug(`#_acquireLock`,`begin`,e);try{if(this.lockAcquired){let e=this.pendingInLock.length?this.pendingInLock[this.pendingInLock.length-1]:Promise.resolve(),n=(async()=>(await e,await t()))();return this.pendingInLock.push((async()=>{try{await n}catch{}})()),n}return await this.lock(`lock:${this.storageKey}`,e,async()=>{this._debug(`#_acquireLock`,`lock acquired for storage key`,this.storageKey);try{this.lockAcquired=!0;let e=t();for(this.pendingInLock.push((async()=>{try{await e}catch{}})()),await e;this.pendingInLock.length;){let e=[...this.pendingInLock];await Promise.all(e),this.pendingInLock.splice(0,e.length)}return await e}finally{this._debug(`#_acquireLock`,`lock released for storage key`,this.storageKey),this.lockAcquired=!1}})}finally{this._debug(`#_acquireLock`,`end`)}}async _useSession(e){this._debug(`#_useSession`,`begin`);try{return await e(await this.__loadSession())}finally{this._debug(`#_useSession`,`end`)}}async __loadSession(){this._debug(`#__loadSession()`,`begin`),this.lockAcquired||this._debug(`#__loadSession()`,`used outside of an acquired lock!`,Error().stack);try{let e=null,t=await W(this.storage,this.storageKey);if(this._debug(`#getSession()`,`session from storage`,t),t!==null&&(this._isValidSession(t)?e=t:(this._debug(`#getSession()`,`session from storage is not valid`),await this._removeSession())),!e)return{data:{session:null},error:null};let n=e.expires_at?e.expires_at*1e3-Date.now()<tn:!1;if(this._debug(`#__loadSession()`,`session has${n?``:` not`} expired`,`expires_at`,e.expires_at),!n){if(this.userStorage){let t=await W(this.userStorage,this.storageKey+`-user`);t?.user?e.user=t.user:e.user=Zn()}if(this.storage.isServer&&e.user&&!e.user.__isUserNotAvailableProxy){let t={value:this.suppressGetSessionWarning};e.user=Qn(e.user,t),t.value&&(this.suppressGetSessionWarning=!0)}return{data:{session:e},error:null}}let{data:r,error:i}=await this._callRefreshToken(e.refresh_token);return i?this._returnResult({data:{session:null},error:i}):this._returnResult({data:{session:r},error:null})}finally{this._debug(`#__loadSession()`,`end`)}}async getUser(e){if(e)return await this._getUser(e);await this.initializePromise;let t=await this._acquireLock(this.lockAcquireTimeout,async()=>await this._getUser());return t.data.user&&(this.suppressGetSessionWarning=!0),t}async _getUser(e){try{return e?await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:e,xform:Z}):await this._useSession(async e=>{let{data:t,error:n}=e;if(n)throw n;return!t.session?.access_token&&!this.hasCustomAuthorizationHeader?{data:{user:null},error:new L}:await Y(this.fetch,`GET`,`${this.url}/user`,{headers:this.headers,jwt:t.session?.access_token??void 0,xform:Z})})}catch(e){if(P(e))return un(e)&&(await this._removeSession(),await G(this.storage,`${this.storageKey}-code-verifier`)),this._returnResult({data:{user:null},error:e});throw e}}async updateUser(e,t={}){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>await this._updateUser(e,t))}async _updateUser(e,t={}){try{return await this._useSession(async n=>{let{data:r,error:i}=n;if(i)throw i;if(!r.session)throw new L;let a=r.session,o=null,s=null;this.flowType===`pkce`&&e.email!=null&&([o,s]=await K(this.storage,this.storageKey));let{data:c,error:l}=await Y(this.fetch,`PUT`,`${this.url}/user`,{headers:this.headers,redirectTo:t?.emailRedirectTo,body:Object.assign(Object.assign({},e),{code_challenge:o,code_challenge_method:s}),jwt:a.access_token,xform:Z});if(l)throw l;return a.user=c.user,await this._saveSession(a),await this._notifyAllSubscribers(`USER_UPDATED`,a),this._returnResult({data:{user:a.user},error:null})})}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:{user:null},error:e});throw e}}async setSession(e){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>await this._setSession(e))}async _setSession(e){try{if(!e.access_token||!e.refresh_token)throw new L;let t=Date.now()/1e3,n=t,r=!0,i=null,{payload:a}=zn(e.access_token);if(a.exp&&(n=a.exp,r=n<=t),r){let{data:t,error:n}=await this._callRefreshToken(e.refresh_token);if(n)return this._returnResult({data:{user:null,session:null},error:n});if(!t)return{data:{user:null,session:null},error:null};i=t}else{let{data:r,error:a}=await this._getUser(e.access_token);if(a)return this._returnResult({data:{user:null,session:null},error:a});i={access_token:e.access_token,refresh_token:e.refresh_token,user:r.user,token_type:`bearer`,expires_in:n-t,expires_at:n},await this._saveSession(i),await this._notifyAllSubscribers(`SIGNED_IN`,i)}return this._returnResult({data:{user:i.user,session:i},error:null})}catch(e){if(P(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}}async refreshSession(e){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>await this._refreshSession(e))}async _refreshSession(e){try{return await this._useSession(async t=>{if(!e){let{data:n,error:r}=t;if(r)throw r;e=n.session??void 0}if(!e?.refresh_token)throw new L;let{data:n,error:r}=await this._callRefreshToken(e.refresh_token);return r?this._returnResult({data:{user:null,session:null},error:r}):n?this._returnResult({data:{user:n.user,session:n},error:null}):this._returnResult({data:{user:null,session:null},error:null})})}catch(e){if(P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}}async _getSessionFromURL(e,t){try{if(!V())throw new fn(`No browser detected.`);if(e.error||e.error_description||e.error_code)throw new fn(e.error_description||`Error in URL with unspecified error_description`,{error:e.error||`unspecified_error`,code:e.error_code||`unspecified_code`});switch(t){case`implicit`:if(this.flowType===`pkce`)throw new mn(`Not a valid PKCE flow url.`);break;case`pkce`:if(this.flowType===`implicit`)throw new fn(`Not a valid implicit grant flow url.`);break;default:}if(t===`pkce`){if(this._debug(`#_initialize()`,`begin`,`is PKCE flow`,!0),!e.code)throw new mn(`No code detected.`);let{data:t,error:n}=await this._exchangeCodeForSession(e.code);if(n)throw n;let r=new URL(window.location.href);return r.searchParams.delete(`code`),window.history.replaceState(window.history.state,``,r.toString()),{data:{session:t.session,redirectType:null},error:null}}let{provider_token:n,provider_refresh_token:r,access_token:i,refresh_token:a,expires_in:o,expires_at:s,token_type:c}=e;if(!i||!o||!a||!c)throw new fn(`No session defined in URL`);let l=Math.round(Date.now()/1e3),u=parseInt(o),d=l+u;s&&(d=parseInt(s));let f=d-l;f*1e3<=N&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL expires in ${f}s, should have been closer to ${u}s`);let p=d-u;l-p>=120?console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued over 120s ago, URL could be stale`,p,d,l):l-p<0&&console.warn(`@supabase/gotrue-js: Session as retrieved from URL was issued in the future? Check the device clock for skew`,p,d,l);let{data:m,error:h}=await this._getUser(i);if(h)throw h;let g={provider_token:n,provider_refresh_token:r,access_token:i,expires_in:u,expires_at:d,refresh_token:a,token_type:c,user:m.user};return window.location.hash=``,this._debug(`#_getSessionFromURL()`,`clearing window.location.hash`),this._returnResult({data:{session:g,redirectType:e.type},error:null})}catch(e){if(P(e))return this._returnResult({data:{session:null,redirectType:null},error:e});throw e}}_isImplicitGrantCallback(e){return typeof this.detectSessionInUrl==`function`?this.detectSessionInUrl(new URL(window.location.href),e):!!(e.access_token||e.error_description)}async _isPKCECallback(e){let t=await W(this.storage,`${this.storageKey}-code-verifier`);return!!(e.code&&t)}async signOut(e={scope:`global`}){return await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>await this._signOut(e))}async _signOut({scope:e}={scope:`global`}){return await this._useSession(async t=>{let{data:n,error:r}=t;if(r&&!un(r))return this._returnResult({error:r});let i=n.session?.access_token;if(i){let{error:t}=await this.admin.signOut(i,e);if(t&&!(ln(t)&&(t.status===404||t.status===401||t.status===403)||un(t)))return this._returnResult({error:t})}return e!==`others`&&(await this._removeSession(),await G(this.storage,`${this.storageKey}-code-verifier`)),this._returnResult({error:null})})}onAuthStateChange(e){let t=Nn(),n={id:t,callback:e,unsubscribe:()=>{this._debug(`#unsubscribe()`,`state change callback with id removed`,t),this.stateChangeEmitters.delete(t)}};return this._debug(`#onAuthStateChange()`,`registered callback with id`,t),this.stateChangeEmitters.set(t,n),(async()=>{await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>{this._emitInitialSession(t)})})(),{data:{subscription:n}}}async _emitInitialSession(e){return await this._useSession(async t=>{try{let{data:{session:n},error:r}=t;if(r)throw r;await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,n),this._debug(`INITIAL_SESSION`,`callback id`,e,`session`,n)}catch(t){await this.stateChangeEmitters.get(e)?.callback(`INITIAL_SESSION`,null),this._debug(`INITIAL_SESSION`,`callback id`,e,`error`,t),console.error(t)}})}async resetPasswordForEmail(e,t={}){let n=null,r=null;this.flowType===`pkce`&&([n,r]=await K(this.storage,this.storageKey,!0));try{return await Y(this.fetch,`POST`,`${this.url}/recover`,{body:{email:e,code_challenge:n,code_challenge_method:r,gotrue_meta_security:{captcha_token:t.captchaToken}},headers:this.headers,redirectTo:t.redirectTo})}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:null,error:e});throw e}}async getUserIdentities(){try{let{data:e,error:t}=await this.getUser();if(t)throw t;return this._returnResult({data:{identities:e.user.identities??[]},error:null})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async linkIdentity(e){return`token`in e?this.linkIdentityIdToken(e):this.linkIdentityOAuth(e)}async linkIdentityOAuth(e){try{let{data:t,error:n}=await this._useSession(async t=>{let{data:n,error:r}=t;if(r)throw r;let i=await this._getUrlForProvider(`${this.url}/user/identities/authorize`,e.provider,{redirectTo:e.options?.redirectTo,scopes:e.options?.scopes,queryParams:e.options?.queryParams,skipBrowserRedirect:!0});return await Y(this.fetch,`GET`,i,{headers:this.headers,jwt:n.session?.access_token??void 0})});if(n)throw n;return V()&&!e.options?.skipBrowserRedirect&&window.location.assign(t?.url),this._returnResult({data:{provider:e.provider,url:t?.url},error:null})}catch(t){if(P(t))return this._returnResult({data:{provider:e.provider,url:null},error:t});throw t}}async linkIdentityIdToken(e){return await this._useSession(async t=>{try{let{error:n,data:{session:r}}=t;if(n)throw n;let{options:i,provider:a,token:o,access_token:s,nonce:c}=e,{data:l,error:u}=await Y(this.fetch,`POST`,`${this.url}/token?grant_type=id_token`,{headers:this.headers,jwt:r?.access_token??void 0,body:{provider:a,id_token:o,access_token:s,nonce:c,link_identity:!0,gotrue_meta_security:{captcha_token:i?.captchaToken}},xform:X});return u?this._returnResult({data:{user:null,session:null},error:u}):!l||!l.session||!l.user?this._returnResult({data:{user:null,session:null},error:new R}):(l.session&&(await this._saveSession(l.session),await this._notifyAllSubscribers(`USER_UPDATED`,l.session)),this._returnResult({data:l,error:u}))}catch(e){if(await G(this.storage,`${this.storageKey}-code-verifier`),P(e))return this._returnResult({data:{user:null,session:null},error:e});throw e}})}async unlinkIdentity(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)throw r;return await Y(this.fetch,`DELETE`,`${this.url}/user/identities/${e.identity_id}`,{headers:this.headers,jwt:n.session?.access_token??void 0})})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _refreshAccessToken(e){let t=`#_refreshAccessToken(${e.substring(0,5)}...)`;this._debug(t,`begin`);try{let n=Date.now();return await Vn(async n=>(n>0&&await Bn(200*2**(n-1)),this._debug(t,`refreshing attempt`,n),await Y(this.fetch,`POST`,`${this.url}/token?grant_type=refresh_token`,{body:{refresh_token:e},headers:this.headers,xform:X})),(e,t)=>{let r=200*2**e;return t&&vn(t)&&Date.now()+r-n<N})}catch(e){if(this._debug(t,`error`,e),P(e))return this._returnResult({data:{session:null,user:null},error:e});throw e}finally{this._debug(t,`end`)}}_isValidSession(e){return typeof e==`object`&&!!e&&`access_token`in e&&`refresh_token`in e&&`expires_at`in e}async _handleProviderSignIn(e,t){let n=await this._getUrlForProvider(`${this.url}/authorize`,e,{redirectTo:t.redirectTo,scopes:t.scopes,queryParams:t.queryParams});return this._debug(`#_handleProviderSignIn()`,`provider`,e,`options`,t,`url`,n),V()&&!t.skipBrowserRedirect&&window.location.assign(n),{data:{provider:e,url:n},error:null}}async _recoverAndRefresh(){let e=`#_recoverAndRefresh()`;this._debug(e,`begin`);try{let t=await W(this.storage,this.storageKey);if(t&&this.userStorage){let e=await W(this.userStorage,this.storageKey+`-user`);!this.storage.isServer&&Object.is(this.storage,this.userStorage)&&!e&&(e={user:t.user},await U(this.userStorage,this.storageKey+`-user`,e)),t.user=e?.user??Zn()}else if(t&&!t.user&&!t.user){let e=await W(this.storage,this.storageKey+`-user`);e&&e?.user?(t.user=e.user,await G(this.storage,this.storageKey+`-user`),await U(this.storage,this.storageKey,t)):t.user=Zn()}if(this._debug(e,`session from storage`,t),!this._isValidSession(t)){this._debug(e,`session is not valid`),t!==null&&await this._removeSession();return}let n=(t.expires_at??1/0)*1e3-Date.now()<tn;if(this._debug(e,`session has${n?``:` not`} expired with margin of ${tn}s`),n){if(this.autoRefreshToken&&t.refresh_token){let{error:n}=await this._callRefreshToken(t.refresh_token);n&&(console.error(n),vn(n)||(this._debug(e,`refresh failed with a non-retryable error, removing the session`,n),await this._removeSession()))}}else if(t.user&&t.user.__isUserNotAvailableProxy===!0)try{let{data:n,error:r}=await this._getUser(t.access_token);!r&&n?.user?(t.user=n.user,await this._saveSession(t),await this._notifyAllSubscribers(`SIGNED_IN`,t)):this._debug(e,`could not get user data, skipping SIGNED_IN notification`)}catch(t){console.error(`Error getting user data:`,t),this._debug(e,`error getting user data, skipping SIGNED_IN notification`,t)}else await this._notifyAllSubscribers(`SIGNED_IN`,t)}catch(t){this._debug(e,`error`,t),console.error(t);return}finally{this._debug(e,`end`)}}async _callRefreshToken(e){var t,n;if(!e)throw new L;if(this.refreshingDeferred)return this.refreshingDeferred.promise;let r=`#_callRefreshToken(${e.substring(0,5)}...)`;this._debug(r,`begin`);try{this.refreshingDeferred=new Rn;let{data:t,error:n}=await this._refreshAccessToken(e);if(n)throw n;if(!t.session)throw new L;await this._saveSession(t.session),await this._notifyAllSubscribers(`TOKEN_REFRESHED`,t.session);let r={data:t.session,error:null};return this.refreshingDeferred.resolve(r),r}catch(e){if(this._debug(r,`error`,e),P(e)){let n={data:null,error:e};return vn(e)||await this._removeSession(),(t=this.refreshingDeferred)==null||t.resolve(n),n}throw(n=this.refreshingDeferred)==null||n.reject(e),e}finally{this.refreshingDeferred=null,this._debug(r,`end`)}}async _notifyAllSubscribers(e,t,n=!0){let r=`#_notifyAllSubscribers(${e})`;this._debug(r,`begin`,t,`broadcast = ${n}`);try{this.broadcastChannel&&n&&this.broadcastChannel.postMessage({event:e,session:t});let r=[],i=Array.from(this.stateChangeEmitters.values()).map(async n=>{try{await n.callback(e,t)}catch(e){r.push(e)}});if(await Promise.all(i),r.length>0){for(let e=0;e<r.length;e+=1)console.error(r[e]);throw r[0]}}finally{this._debug(r,`end`)}}async _saveSession(e){this._debug(`#_saveSession()`,e),this.suppressGetSessionWarning=!0,await G(this.storage,`${this.storageKey}-code-verifier`);let t=Object.assign({},e),n=t.user&&t.user.__isUserNotAvailableProxy===!0;if(this.userStorage){!n&&t.user&&await U(this.userStorage,this.storageKey+`-user`,{user:t.user});let e=Object.assign({},t);delete e.user;let r=$n(e);await U(this.storage,this.storageKey,r)}else{let e=$n(t);await U(this.storage,this.storageKey,e)}}async _removeSession(){this._debug(`#_removeSession()`),this.suppressGetSessionWarning=!1,await G(this.storage,this.storageKey),await G(this.storage,this.storageKey+`-code-verifier`),await G(this.storage,this.storageKey+`-user`),this.userStorage&&await G(this.userStorage,this.storageKey+`-user`),await this._notifyAllSubscribers(`SIGNED_OUT`,null)}_removeVisibilityChangedCallback(){this._debug(`#_removeVisibilityChangedCallback()`);let e=this.visibilityChangedCallback;this.visibilityChangedCallback=null;try{e&&V()&&window!=null&&window.removeEventListener&&window.removeEventListener(`visibilitychange`,e)}catch(e){console.error(`removing visibilitychange callback failed`,e)}}async _startAutoRefresh(){await this._stopAutoRefresh(),this._debug(`#_startAutoRefresh()`);let e=setInterval(()=>this._autoRefreshTokenTick(),N);this.autoRefreshTicker=e,e&&typeof e==`object`&&typeof e.unref==`function`?e.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(e);let t=setTimeout(async()=>{await this.initializePromise,await this._autoRefreshTokenTick()},0);this.autoRefreshTickTimeout=t,t&&typeof t==`object`&&typeof t.unref==`function`?t.unref():typeof Deno<`u`&&typeof Deno.unrefTimer==`function`&&Deno.unrefTimer(t)}async _stopAutoRefresh(){this._debug(`#_stopAutoRefresh()`);let e=this.autoRefreshTicker;this.autoRefreshTicker=null,e&&clearInterval(e);let t=this.autoRefreshTickTimeout;this.autoRefreshTickTimeout=null,t&&clearTimeout(t)}async startAutoRefresh(){this._removeVisibilityChangedCallback(),await this._startAutoRefresh()}async stopAutoRefresh(){this._removeVisibilityChangedCallback(),await this._stopAutoRefresh()}async _autoRefreshTokenTick(){this._debug(`#_autoRefreshTokenTick()`,`begin`);try{await this._acquireLock(0,async()=>{try{let e=Date.now();try{return await this._useSession(async t=>{let{data:{session:n}}=t;if(!n||!n.refresh_token||!n.expires_at){this._debug(`#_autoRefreshTokenTick()`,`no session`);return}let r=Math.floor((n.expires_at*1e3-e)/N);this._debug(`#_autoRefreshTokenTick()`,`access token expires in ${r} ticks, a tick lasts ${N}ms, refresh threshold is 3 ticks`),r<=3&&await this._callRefreshToken(n.refresh_token)})}catch(e){console.error(`Auto refresh tick failed with error. This is likely a transient error.`,e)}}finally{this._debug(`#_autoRefreshTokenTick()`,`end`)}})}catch(e){if(e.isAcquireTimeout||e instanceof fr)this._debug(`auto refresh token tick lock not available`);else throw e}}async _handleVisibilityChange(){if(this._debug(`#_handleVisibilityChange()`),!V()||!(window!=null&&window.addEventListener))return this.autoRefreshToken&&this.startAutoRefresh(),!1;try{this.visibilityChangedCallback=async()=>{try{await this._onVisibilityChanged(!1)}catch(e){this._debug(`#visibilityChangedCallback`,`error`,e)}},window==null||window.addEventListener(`visibilitychange`,this.visibilityChangedCallback),await this._onVisibilityChanged(!0)}catch(e){console.error(`_handleVisibilityChange`,e)}}async _onVisibilityChanged(e){let t=`#_onVisibilityChanged(${e})`;this._debug(t,`visibilityState`,document.visibilityState),document.visibilityState===`visible`?(this.autoRefreshToken&&this._startAutoRefresh(),e||(await this.initializePromise,await this._acquireLock(this.lockAcquireTimeout,async()=>{if(document.visibilityState!==`visible`){this._debug(t,`acquired the lock to recover the session, but the browser visibilityState is no longer visible, aborting`);return}await this._recoverAndRefresh()}))):document.visibilityState===`hidden`&&this.autoRefreshToken&&this._stopAutoRefresh()}async _getUrlForProvider(e,t,n){let r=[`provider=${encodeURIComponent(t)}`];if(n?.redirectTo&&r.push(`redirect_to=${encodeURIComponent(n.redirectTo)}`),n?.scopes&&r.push(`scopes=${encodeURIComponent(n.scopes)}`),this.flowType===`pkce`){let[e,t]=await K(this.storage,this.storageKey),n=new URLSearchParams({code_challenge:`${encodeURIComponent(e)}`,code_challenge_method:`${encodeURIComponent(t)}`});r.push(n.toString())}if(n?.queryParams){let e=new URLSearchParams(n.queryParams);r.push(e.toString())}return n?.skipBrowserRedirect&&r.push(`skip_http_redirect=${n.skipBrowserRedirect}`),`${e}?${r.join(`&`)}`}async _unenroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;return r?this._returnResult({data:null,error:r}):await Y(this.fetch,`DELETE`,`${this.url}/factors/${e.factorId}`,{headers:this.headers,jwt:n?.session?.access_token})})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _enroll(e){try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({friendly_name:e.friendlyName,factor_type:e.factorType},e.factorType===`phone`?{phone:e.phone}:e.factorType===`totp`?{issuer:e.issuer}:{}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(e.factorType===`totp`&&a.type===`totp`&&a?.totp?.qr_code&&(a.totp.qr_code=`data:image/svg+xml;utf-8,${a.totp.qr_code}`),this._returnResult({data:a,error:null}))})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _verify(e){return this._acquireLock(this.lockAcquireTimeout,async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=Object.assign({challenge_id:e.challengeId},`webauthn`in e?{webauthn:Object.assign(Object.assign({},e.webauthn),{credential_response:e.webauthn.type===`create`?kr(e.webauthn.credential_response):Ar(e.webauthn.credential_response)})}:{code:e.code}),{data:a,error:o}=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/verify`,{body:i,headers:this.headers,jwt:n?.session?.access_token});return o?this._returnResult({data:null,error:o}):(await this._saveSession(Object.assign({expires_at:Math.round(Date.now()/1e3)+a.expires_in},a)),await this._notifyAllSubscribers(`MFA_CHALLENGE_VERIFIED`,a),this._returnResult({data:a,error:o}))})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}})}async _challenge(e){return this._acquireLock(this.lockAcquireTimeout,async()=>{try{return await this._useSession(async t=>{let{data:n,error:r}=t;if(r)return this._returnResult({data:null,error:r});let i=await Y(this.fetch,`POST`,`${this.url}/factors/${e.factorId}/challenge`,{body:e,headers:this.headers,jwt:n?.session?.access_token});if(i.error)return i;let{data:a}=i;if(a.type!==`webauthn`)return{data:a,error:null};switch(a.webauthn.type){case`create`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:Dr(a.webauthn.credential_options.publicKey)})})}),error:null};case`request`:return{data:Object.assign(Object.assign({},a),{webauthn:Object.assign(Object.assign({},a.webauthn),{credential_options:Object.assign(Object.assign({},a.webauthn.credential_options),{publicKey:Or(a.webauthn.credential_options.publicKey)})})}),error:null}}})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}})}async _challengeAndVerify(e){let{data:t,error:n}=await this._challenge({factorId:e.factorId});return n?this._returnResult({data:null,error:n}):await this._verify({factorId:e.factorId,challengeId:t.id,code:e.code})}async _listFactors(){let{data:{user:e},error:t}=await this.getUser();if(t)return{data:null,error:t};let n={all:[],phone:[],totp:[],webauthn:[]};for(let t of e?.factors??[])n.all.push(t),t.status===`verified`&&n[t.factor_type].push(t);return{data:n,error:null}}async _getAuthenticatorAssuranceLevel(e){if(e)try{let{payload:t}=zn(e),n=null;t.aal&&(n=t.aal);let r=n,{data:{user:i},error:a}=await this.getUser(e);if(a)return this._returnResult({data:null,error:a});((i?.factors)?.filter(e=>e.status===`verified`)??[]).length>0&&(r=`aal2`);let o=t.amr||[];return{data:{currentLevel:n,nextLevel:r,currentAuthenticationMethods:o},error:null}}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}let{data:{session:t},error:n}=await this.getSession();if(n)return this._returnResult({data:null,error:n});if(!t)return{data:{currentLevel:null,nextLevel:null,currentAuthenticationMethods:[]},error:null};let{payload:r}=zn(t.access_token),i=null;r.aal&&(i=r.aal);let a=i;(t.user.factors?.filter(e=>e.status===`verified`)??[]).length>0&&(a=`aal2`);let o=r.amr||[];return{data:{currentLevel:i,nextLevel:a,currentAuthenticationMethods:o},error:null}}async _getAuthorizationDetails(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?await Y(this.fetch,`GET`,`${this.url}/oauth/authorizations/${e}`,{headers:this.headers,jwt:n.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new L})})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _approveAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new L});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`approve`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&V()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _denyAuthorization(e,t){try{return await this._useSession(async n=>{let{data:{session:r},error:i}=n;if(i)return this._returnResult({data:null,error:i});if(!r)return this._returnResult({data:null,error:new L});let a=await Y(this.fetch,`POST`,`${this.url}/oauth/authorizations/${e}/consent`,{headers:this.headers,jwt:r.access_token,body:{action:`deny`},xform:e=>({data:e,error:null})});return a.data&&a.data.redirect_url&&V()&&!t?.skipBrowserRedirect&&window.location.assign(a.data.redirect_url),a})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _listOAuthGrants(){try{return await this._useSession(async e=>{let{data:{session:t},error:n}=e;return n?this._returnResult({data:null,error:n}):t?await Y(this.fetch,`GET`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:t.access_token,xform:e=>({data:e,error:null})}):this._returnResult({data:null,error:new L})})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async _revokeOAuthGrant(e){try{return await this._useSession(async t=>{let{data:{session:n},error:r}=t;return r?this._returnResult({data:null,error:r}):n?(await Y(this.fetch,`DELETE`,`${this.url}/user/oauth/grants`,{headers:this.headers,jwt:n.access_token,query:{client_id:e.clientId},noResolveJson:!0}),{data:{},error:null}):this._returnResult({data:null,error:new L})})}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}async fetchJwk(e,t={keys:[]}){let n=t.keys.find(t=>t.kid===e);if(n)return n;let r=Date.now();if(n=this.jwks.keys.find(t=>t.kid===e),n&&this.jwks_cached_at+6e5>r)return n;let{data:i,error:a}=await Y(this.fetch,`GET`,`${this.url}/.well-known/jwks.json`,{headers:this.headers});if(a)throw a;return!i.keys||i.keys.length===0||(this.jwks=i,this.jwks_cached_at=r,n=i.keys.find(t=>t.kid===e),!n)?null:n}async getClaims(e,t={}){try{let n=e;if(!n){let{data:e,error:t}=await this.getSession();if(t||!e.session)return this._returnResult({data:null,error:t});n=e.session.access_token}let{header:r,payload:i,signature:a,raw:{header:o,payload:s}}=zn(n);t?.allowExpired||Jn(i.exp);let c=!r.alg||r.alg.startsWith(`HS`)||!r.kid||!(`crypto`in globalThis&&`subtle`in globalThis.crypto)?null:await this.fetchJwk(r.kid,t?.keys?{keys:t.keys}:t?.jwks);if(!c){let{error:e}=await this.getUser(n);if(e)throw e;return{data:{claims:i,header:r,signature:a},error:null}}let l=Yn(r.alg),u=await crypto.subtle.importKey(`jwk`,c,l,!0,[`verify`]);if(!await crypto.subtle.verify(l,u,a,jn(`${o}.${s}`)))throw new xn(`Invalid JWT signature`);return{data:{claims:i,header:r,signature:a},error:null}}catch(e){if(P(e))return this._returnResult({data:null,error:e});throw e}}};Wr.nextInstanceID={};var Gr=Wr,Kr=ur,qr=Gr,Jr=class extends qr{constructor(e){super(e)}},Yr=class{constructor(e,t,n){this.supabaseUrl=e,this.supabaseKey=t;let r=$t(e);if(!t)throw Error(`supabaseKey is required.`);this.realtimeUrl=new URL(`realtime/v1`,r),this.realtimeUrl.protocol=this.realtimeUrl.protocol.replace(`http`,`ws`),this.authUrl=new URL(`auth/v1`,r),this.storageUrl=new URL(`storage/v1`,r),this.functionsUrl=new URL(`functions/v1`,r);let i=`sb-${r.hostname.split(`.`)[0]}-auth-token`,a={db:Gt,realtime:qt,auth:{...Kt,storageKey:i},global:Wt},o=Qt(n??{},a);this.storageKey=o.auth.storageKey??``,this.headers=o.global.headers??{},o.accessToken?(this.accessToken=o.accessToken,this.auth=new Proxy({},{get:(e,t)=>{throw Error(`@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase.auth.${String(t)} is not possible`)}})):this.auth=this._initSupabaseAuthClient(o.auth??{},this.headers,o.global.fetch),this.fetch=Xt(t,this._getAccessToken.bind(this),o.global.fetch),this.realtime=this._initRealtimeClient({headers:this.headers,accessToken:this._getAccessToken.bind(this),...o.realtime}),this.accessToken&&Promise.resolve(this.accessToken()).then(e=>this.realtime.setAuth(e)).catch(e=>console.warn(`Failed to set initial Realtime auth token:`,e)),this.rest=new re(new URL(`rest/v1`,r).href,{headers:this.headers,schema:o.db.schema,fetch:this.fetch,timeout:o.db.timeout,urlLengthLimit:o.db.urlLengthLimit}),this.storage=new Ht(this.storageUrl.href,this.headers,this.fetch,n?.storage),o.accessToken||this._listenForAuthEvents()}get functions(){return new l(this.functionsUrl.href,{headers:this.headers,customFetch:this.fetch})}from(e){return this.rest.from(e)}schema(e){return this.rest.schema(e)}rpc(e,t={},n={head:!1,get:!1,count:void 0}){return this.rest.rpc(e,t,n)}channel(e,t={config:{}}){return this.realtime.channel(e,t)}getChannels(){return this.realtime.getChannels()}removeChannel(e){return this.realtime.removeChannel(e)}removeAllChannels(){return this.realtime.removeAllChannels()}async _getAccessToken(){if(this.accessToken)return await this.accessToken();let{data:e}=await this.auth.getSession();return e.session?.access_token??this.supabaseKey}_initSupabaseAuthClient({autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,storageKey:a,flowType:o,lock:s,debug:c,throwOnError:l},u,d){let f={Authorization:`Bearer ${this.supabaseKey}`,apikey:`${this.supabaseKey}`};return new Jr({url:this.authUrl.href,headers:{...f,...u},storageKey:a,autoRefreshToken:e,persistSession:t,detectSessionInUrl:n,storage:r,userStorage:i,flowType:o,lock:s,debug:c,throwOnError:l,fetch:d,hasCustomAuthorizationHeader:Object.keys(this.headers).some(e=>e.toLowerCase()===`authorization`)})}_initRealtimeClient(e){return new Ye(this.realtimeUrl.href,{...e,params:{apikey:this.supabaseKey,...e?.params}})}_listenForAuthEvents(){return this.auth.onAuthStateChange((e,t)=>{this._handleTokenChanged(e,`CLIENT`,t?.access_token)})}_handleTokenChanged(e,t,n){(e===`TOKEN_REFRESHED`||e===`SIGNED_IN`)&&this.changedAccessToken!==n?(this.changedAccessToken=n,this.realtime.setAuth(n)):e===`SIGNED_OUT`&&(this.realtime.setAuth(),t==`STORAGE`&&this.auth.signOut(),this.changedAccessToken=void 0)}};let Xr=(e,t,n)=>new Yr(e,t,n);function Zr(){if(typeof window<`u`)return!1;let e=globalThis.process;if(!e)return!1;let t=e.version;if(t==null)return!1;let n=t.match(/^v(\d+)\./);return n?parseInt(n[1],10)<=18:!1}return Zr()&&console.warn(`⚠️  Node.js 18 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 20 or later. For more information, visit: https://github.com/orgs/supabase/discussions/37217`),e.AuthAdminApi=Kr,e.AuthApiError=cn,e.AuthClient=qr,e.AuthError=sn,e.AuthImplicitGrantRedirectError=fn,e.AuthInvalidCredentialsError=dn,e.AuthInvalidJwtError=xn,e.AuthInvalidTokenResponseError=R,e.AuthPKCECodeVerifierMissingError=hn,e.AuthPKCEGrantCodeExchangeError=mn,e.AuthRetryableFetchError=_n,e.AuthSessionMissingError=L,e.AuthUnknownError=F,e.AuthWeakPasswordError=yn,e.CustomAuthError=I,Object.defineProperty(e,`FunctionRegion`,{enumerable:!0,get:function(){return c}}),e.FunctionsError=i,e.FunctionsFetchError=a,e.FunctionsHttpError=s,e.FunctionsRelayError=o,e.GoTrueAdminApi=ur,e.GoTrueClient=Gr,e.NavigatorLockAcquireTimeoutError=pr,e.PostgrestError=u,e.REALTIME_CHANNEL_STATES=We,Object.defineProperty(e,`REALTIME_LISTEN_TYPES`,{enumerable:!0,get:function(){return D}}),Object.defineProperty(e,`REALTIME_POSTGRES_CHANGES_LISTEN_EVENT`,{enumerable:!0,get:function(){return Ue}}),Object.defineProperty(e,`REALTIME_PRESENCE_LISTEN_EVENTS`,{enumerable:!0,get:function(){return ze}}),Object.defineProperty(e,`REALTIME_SUBSCRIBE_STATES`,{enumerable:!0,get:function(){return O}}),e.RealtimeChannel=Ge,e.RealtimeClient=Ye,e.RealtimePresence=Be,e.SIGN_OUT_SCOPES=lr,e.SupabaseClient=Yr,e.WebSocketFactory=ie,e.createClient=Xr,e.isAuthApiError=ln,e.isAuthError=P,e.isAuthImplicitGrantRedirectError=pn,e.isAuthPKCECodeVerifierMissingError=gn,e.isAuthRetryableFetchError=vn,e.isAuthSessionMissingError=un,e.isAuthWeakPasswordError=bn,e.lockInternals=Q,e.navigatorLock=hr,e.processLock=_r,e})({});
 </script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background-color: #f5f5f5;
             padding-bottom: 80px;
         }
+
+        /* ===== 顶部导航栏 ===== */
         .header {
-            position: sticky;
-            top: 0;
-            background: white;
-            padding: 16px;
+            position: sticky; top: 0;
+            background: white; padding: 10px 16px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
         }
+        .header h1 { font-size: 18px; color: #333; white-space: nowrap; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .user-badge {
+            font-size: 12px; color: #666; background: #f0f0f0;
+            padding: 4px 10px; border-radius: 12px;
+            max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .header-btn {
+            padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px;
+            background: white; color: #666; cursor: pointer; font-size: 13px; transition: all 0.2s;
+        }
+        .header-btn:hover { border-color: #ff9800; color: #ff9800; }
+        .header-btn.active { background: #ff9800; color: white; border-color: #ff9800; }
+        .header-btn.user-active { background: #2196F3; color: white; border-color: #2196F3; }
+
+        /* ===== 管理员栏 ===== */
+        .admin-bar {
+            display: none; padding: 8px 16px; background: #fff8e1;
+            border-bottom: 1px solid #ffe0b2; gap: 8px; align-items: center;
+        }
+        .admin-bar.show { display: flex; }
+        .admin-bar input, .admin-bar select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
+        .admin-bar button {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            background: #ff9800; color: white; cursor: pointer; white-space: nowrap;
+        }
+
+        /* ===== Tabs ===== */
         .tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
+            display: flex; gap: 0; background: white;
+            border-bottom: 1px solid #eee;
+            position: sticky; top: 52px; z-index: 99;
         }
         .tab {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            border-radius: 8px;
-            cursor: pointer;
-            background: #f0f0f0;
-            transition: all 0.3s;
+            flex: 1; padding: 12px; text-align: center; cursor: pointer;
+            background: white; transition: all 0.3s; font-size: 14px;
+            color: #999; border-bottom: 2px solid transparent;
         }
-        .tab.active {
-            background: #2196F3;
-            color: white;
+        .tab.active { color: #2196F3; border-bottom-color: #2196F3; font-weight: 500; }
+        .tab:hover { background: #fafafa; }
+
+        /* ===== 右侧悬浮按钮 ===== */
+        .fab-container {
+            position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+            z-index: 90; display: flex; flex-direction: column; gap: 12px;
         }
-        .admin-area {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
+        .fab {
+            width: 52px; height: 52px; border-radius: 50%; border: none;
+            color: white; font-size: 22px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; position: relative;
         }
-        .admin-area input {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            outline: none;
+        .fab:hover { transform: scale(1.1); }
+        .fab-upload { background: #4CAF50; }
+        .fab-album { background: #9C27B0; }
+        .fab-tooltip {
+            position: absolute; right: 60px; background: rgba(0,0,0,0.75);
+            color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px;
+            white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s;
         }
-        .admin-area button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            background: #ff9800;
-            color: white;
-            cursor: pointer;
+        .fab:hover .fab-tooltip { opacity: 1; }
+
+        /* ===== 弹窗通用 ===== */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            align-items: center; justify-content: center;
         }
-        .upload-area {
-            text-align: center;
-            padding: 20px;
-            background: white;
-            margin: 16px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        .modal-overlay.show { display: flex; }
+        .modal-panel {
+            background: white; border-radius: 16px; padding: 24px;
+            width: 90%; max-width: 440px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            max-height: 90vh; overflow-y: auto;
         }
-        .upload-btn {
-            display: inline-block;
-            padding: 12px 32px;
-            background: #4CAF50;
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
+        .modal-panel h3 { margin-bottom: 16px; font-size: 18px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 8px 12px; border: 1px solid #ddd;
+            border-radius: 6px; outline: none; font-size: 14px;
         }
-        .upload-btn:hover {
-            background: #43a047;
+        .form-group input::placeholder { color: #ccc; }
+        .upload-drop {
+            border: 2px dashed #ccc; border-radius: 12px; padding: 32px;
+            text-align: center; cursor: pointer; transition: all 0.3s; margin-bottom: 12px;
         }
-        #file-input {
-            display: none;
+        .upload-drop:hover, .upload-drop.dragover { border-color: #4CAF50; background: #f1f8e9; }
+        .upload-drop .icon { font-size: 36px; margin-bottom: 8px; }
+        .upload-drop .text { color: #999; font-size: 14px; }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .btn-cancel {
+            padding: 8px 20px; border: 1px solid #ddd; border-radius: 6px;
+            background: white; cursor: pointer;
         }
+        .btn-confirm {
+            padding: 8px 20px; border: none; border-radius: 6px;
+            background: #4CAF50; color: white; cursor: pointer;
+        }
+        .btn-confirm:disabled { background: #ccc; cursor: default; }
+        .btn-confirm.purple { background: #9C27B0; }
+        .btn-confirm.blue { background: #2196F3; }
+        .file-list { max-height: 100px; overflow-y: auto; font-size: 12px; color: #666; margin-bottom: 8px; }
+        .progress-bar {
+            height: 3px; background: #e0e0e0; border-radius: 2px;
+            margin-top: 8px; overflow: hidden; display: none;
+        }
+        .progress-bar.show { display: block; }
+        .progress-bar .progress {
+            height: 100%; background: #4CAF50; border-radius: 2px;
+            transition: width 0.3s; width: 0%;
+        }
+        .hidden-input { display: none; }
+
+        /* ===== 相册网格 ===== */
+        .albums-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px; padding: 16px;
+        }
+        .album-card {
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer;
+            transition: all 0.2s; position: relative;
+        }
+        .album-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+        .album-card .album-cover {
+            width: 100%; aspect-ratio: 1; background: #eee;
+            display: flex; align-items: center; justify-content: center;
+            color: #ccc; font-size: 40px; overflow: hidden;
+        }
+        .album-card .album-cover img { width: 100%; height: 100%; object-fit: cover; }
+        .album-card .album-info { padding: 10px; }
+        .album-card .album-name { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 2px; }
+        .album-card .album-meta { font-size: 12px; color: #999; }
+        .album-card .album-uploader { font-size: 11px; color: #bbb; margin-top: 2px; }
+
+        /* ===== 图片网格 ===== */
         .images-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            padding: 0 16px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px; padding: 0 16px;
         }
         .image-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            position: relative;
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); position: relative;
         }
         .image-card img {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
-            cursor: pointer;
+            width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer;
+            background: #eee;
         }
         .image-info {
-            padding: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            padding: 8px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .image-uploader-name {
+            font-size: 11px; color: #999; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; max-width: 80px;
         }
         .like-btn {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            color: #666;
-            border: none;
-            background: none;
-            font-size: 14px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: all 0.2s;
+            display: flex; align-items: center; gap: 4px; cursor: pointer;
+            color: #666; border: none; background: none; font-size: 14px;
+            padding: 4px 8px; border-radius: 4px; transition: all 0.2s; flex-shrink: 0;
         }
-        .like-btn:hover {
-            background: #f0f0f0;
-        }
-        .like-btn.liked {
-            color: #e91e63;
-        }
+        .like-btn:hover { background: #f0f0f0; }
+        .like-btn.liked { color: #e91e63; }
         .delete-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            border: none;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
+            position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+            border-radius: 50%; background: rgba(0,0,0,0.5); color: white;
+            border: none; cursor: pointer; display: none;
+            align-items: center; justify-content: center; font-size: 16px;
         }
-        .delete-btn.show {
-            display: flex;
+        .delete-btn.show { display: flex; }
+
+        /* ===== 相册详情头部 ===== */
+        .album-detail-header {
+            padding: 16px; background: white; margin: 0 16px; margin-top: 16px;
+            border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex; align-items: center; gap: 12px;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 200;
-            align-items: center;
-            justify-content: center;
+        .back-btn {
+            width: 36px; height: 36px; border-radius: 50%; border: 1px solid #ddd;
+            background: white; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 18px; color: #666; flex-shrink: 0;
         }
-        .modal img {
-            max-width: 90%;
-            max-height: 90%;
-            object-fit: contain;
+        .album-detail-header .album-title { font-size: 18px; font-weight: 500; color: #333; }
+        .album-detail-header .album-desc { font-size: 12px; color: #999; }
+
+        /* ===== 大图查看 ===== */
+        .image-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 300;
+            align-items: center; justify-content: center;
         }
-        .modal .close {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            color: white;
-            font-size: 32px;
-            cursor: pointer;
+        .image-modal.show { display: flex; }
+        .image-modal img { max-width: 90%; max-height: 80%; object-fit: contain; }
+        .image-modal .close {
+            position: absolute; top: 16px; right: 16px; color: white;
+            font-size: 32px; cursor: pointer; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
         }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #999;
+        .image-modal .modal-uploader {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.7); font-size: 14px;
         }
+
+        /* ===== 白名单管理面板 ===== */
+        .whitelist-section { margin-top: 16px; padding: 16px; background: #f9f9f9; border-radius: 12px; }
+        .whitelist-section h4 { font-size: 15px; margin-bottom: 12px; color: #333; }
+        .whitelist-search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+        .whitelist-search-row input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; outline: none; }
+        .whitelist-search-row button {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            background: #2196F3; color: white; cursor: pointer; white-space: nowrap;
+        }
+        .search-results {
+            background: white; border: 1px solid #eee; border-radius: 8px;
+            max-height: 200px; overflow-y: auto; margin-bottom: 12px;
+        }
+        .search-result-item {
+            padding: 10px 12px; display: flex; align-items: center;
+            justify-content: space-between; border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+        }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item .sr-id { font-weight: 500; color: #333; }
+        .search-result-item .sr-name { color: #999; margin-left: 8px; }
+        .search-result-item .sr-count { color: #999; font-size: 12px; }
+        .search-result-item button {
+            padding: 4px 12px; border: none; border-radius: 4px;
+            cursor: pointer; font-size: 12px;
+        }
+        .btn-add-wl { background: #4CAF50; color: white; }
+        .btn-remove-wl { background: #f44336; color: white; }
+        .whitelist-current { font-size: 13px; color: #666; }
+        .whitelist-current .wl-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .whitelist-current .wl-item:last-child { border-bottom: none; }
+
+        /* ===== 用户登录/注册弹窗 ===== */
+        .auth-tabs { display: flex; margin-bottom: 16px; border-bottom: 1px solid #eee; }
+        .auth-tab {
+            flex: 1; padding: 10px; text-align: center; cursor: pointer;
+            font-size: 14px; color: #999; border-bottom: 2px solid transparent;
+        }
+        .auth-tab.active { color: #2196F3; border-bottom-color: #2196F3; }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .auth-hint { font-size: 12px; color: #999; margin-top: 8px; }
+
+        /* ===== 通用 ===== */
+        .loading { text-align: center; padding: 40px; color: #999; }
         .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            display: none;
-            z-index: 300;
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 12px 24px;
+            border-radius: 8px; display: none; z-index: 500; white-space: nowrap;
+            max-width: 90%; text-align: center;
+        }
+        .empty-state { text-align: center; padding: 60px 20px; color: #bbb; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state .text { font-size: 14px; }
+        .not-whitelisted-tip {
+            text-align: center; padding: 20px; margin: 16px;
+            background: #fff3e0; border-radius: 12px; font-size: 13px; color: #e65100;
+        }
+
+        /* ===== 图片压缩提示 ===== */
+        .compress-info {
+            font-size: 11px; color: #999; margin-top: 4px;
         }
     </style>
 </head>
 <body>
+    <!-- 顶部导航 -->
     <div class="header">
-        <div class="tabs">
-            <div class="tab active" data-tab="home">最新上传</div>
-            <div class="tab" data-tab="ranking">点赞排行榜</div>
-        </div>
-        <div class="admin-area">
-            <input type="password" id="admin-pwd" placeholder="管理员密码（仅你用）">
-            <button onclick="adminLogin()">进入管理</button>
+        <h1>极简共享相册</h1>
+        <div class="header-right">
+            <span class="user-badge" id="user-badge" style="display:none;"></span>
+            <button class="header-btn" id="auth-btn" onclick="openAuthModal()">登录</button>
+            <button class="header-btn" id="admin-toggle-btn" onclick="toggleAdminBar()">&#9881;</button>
         </div>
     </div>
 
-    <div class="upload-area">
-        <label class="upload-btn">
-            📷 上传图片
-            <input type="file" id="file-input" multiple accept="image/*">
-        </label>
+    <!-- 管理员密码栏 -->
+    <div class="admin-bar" id="admin-bar">
+        <input type="password" id="admin-pwd" placeholder="输入管理员密码">
+        <button onclick="adminLogin()">确认</button>
     </div>
 
+    <!-- 管理员面板（白名单管理等） -->
+    <div class="admin-bar" id="admin-panel" style="display:none; flex-direction:column; padding:16px;">
+        <div class="whitelist-section" style="width:100%;">
+            <h4>&#128274; 白名单管理</h4>
+            <div class="whitelist-search-row">
+                <input type="text" id="wl-search-input" placeholder="输入用户ID或昵称搜索">
+                <button onclick="searchUsers()">搜索</button>
+            </div>
+            <div class="search-results" id="wl-search-results" style="display:none;"></div>
+            <div class="whitelist-current" id="wl-current-list">
+                <strong>当前白名单：</strong><br>
+                <span style="color:#999;font-size:12px;">加载中...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 栏 -->
+    <div class="tabs">
+        <div class="tab active" data-tab="home">最新上传</div>
+        <div class="tab" data-tab="albums">相册</div>
+        <div class="tab" data-tab="ranking">排行榜</div>
+    </div>
+
+    <!-- 各面板 -->
     <div id="home-panel">
+        <div id="not-wl-tip-home" class="not-whitelisted-tip" style="display:none;">
+            &#9888;&#65039; 你尚未登录，或未在白名单中。登录后即可上传图片。
+        </div>
         <div class="images-grid" id="home-images"></div>
+    </div>
+
+    <div id="albums-panel" style="display: none;">
+        <div id="not-wl-tip-albums" class="not-whitelisted-tip" style="display:none;">
+            &#9888;&#65039; 你尚未登录，或未在白名单中。登录后即可创建相册。
+        </div>
+        <div id="album-list-view">
+            <div class="albums-grid" id="albums-grid"></div>
+        </div>
+        <div id="album-detail-view" style="display: none;">
+            <div class="album-detail-header">
+                <button class="back-btn" onclick="backToAlbumList()">&#8592;</button>
+                <div>
+                    <div class="album-title" id="detail-album-name"></div>
+                    <div class="album-desc" id="detail-album-desc"></div>
+                </div>
+            </div>
+            <div style="padding-top:12px;"></div>
+            <div class="images-grid" id="album-detail-images"></div>
+        </div>
     </div>
 
     <div id="ranking-panel" style="display: none;">
         <div class="images-grid" id="ranking-images"></div>
     </div>
 
-    <div class="modal" id="image-modal">
+    <!-- 大图查看 -->
+    <div class="image-modal" id="image-modal">
         <span class="close" onclick="closeModal()">&times;</span>
         <img id="modal-img" src="">
+        <div class="modal-uploader" id="modal-uploader"></div>
+    </div>
+
+    <!-- 用户登录/注册弹窗 -->
+    <div class="modal-overlay" id="auth-modal">
+        <div class="modal-panel">
+            <div class="auth-tabs">
+                <div class="auth-tab active" data-auth="login" onclick="switchAuthTab('login')">登录</div>
+                <div class="auth-tab" data-auth="register" onclick="switchAuthTab('register')">注册</div>
+            </div>
+            <div class="auth-form active" id="auth-login-form">
+                <div class="form-group">
+                    <label>用户 ID</label>
+                    <input type="text" id="login-id" placeholder="输入你的ID" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="login-pwd" placeholder="输入密码" maxlength="32">
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeAuthModal()">取消</button>
+                    <button class="btn-confirm blue" onclick="doLogin()">登录</button>
+                </div>
+            </div>
+            <div class="auth-form" id="auth-register-form">
+                <div class="form-group">
+                    <label>用户 ID（唯一，注册后不可修改）</label>
+                    <input type="text" id="reg-id" placeholder="设置你的唯一ID" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>昵称（显示在上传的图片旁）</label>
+                    <input type="text" id="reg-nickname" placeholder="你的昵称" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="reg-pwd" placeholder="设置密码" maxlength="32">
+                </div>
+                <div class="auth-hint">注册后需要管理员将你加入白名单才能上传作品</div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeAuthModal()">取消</button>
+                    <button class="btn-confirm blue" onclick="doRegister()">注册</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传图片弹窗 -->
+    <div class="modal-overlay" id="upload-modal">
+        <div class="modal-panel">
+            <h3>&#128247; 上传图片</h3>
+            <div class="form-group">
+                <label>选择相册（选填）</label>
+                <select id="upload-album-select">
+                    <option value="">不放入相册</option>
+                </select>
+            </div>
+            <div class="upload-drop" id="upload-drop" onclick="document.getElementById('file-input-image').click()">
+                <div class="icon">&#128228;</div>
+                <div class="text">点击选择图片或拖拽到此处</div>
+                <div class="compress-info">图片将自动压缩至最大宽度 1200px，质量 80%</div>
+            </div>
+            <input type="file" class="hidden-input" id="file-input-image" multiple accept="image/*">
+            <div class="file-list" id="upload-file-list"></div>
+            <div class="progress-bar" id="upload-progress">
+                <div class="progress" id="upload-progress-bar"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeUploadModal()">取消</button>
+                <button class="btn-confirm" id="upload-confirm-btn" onclick="confirmUpload()" disabled>上传</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建相册弹窗 -->
+    <div class="modal-overlay" id="album-create-modal">
+        <div class="modal-panel">
+            <h3>&#128218; 创建相册</h3>
+            <div class="form-group">
+                <label>相册名称</label>
+                <input type="text" id="album-name-input" placeholder="给相册起个名字" maxlength="30">
+            </div>
+            <div class="upload-drop" id="album-cover-drop" onclick="document.getElementById('file-input-album-cover').click()">
+                <div class="icon">&#127912;</div>
+                <div class="text">点击选择封面图片（选填）</div>
+            </div>
+            <input type="file" class="hidden-input" id="file-input-album-cover" accept="image/*">
+            <div class="file-list" id="album-cover-file-list"></div>
+            <div class="progress-bar" id="album-progress">
+                <div class="progress" id="album-progress-bar"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeAlbumCreateModal()">取消</button>
+                <button class="btn-confirm purple" id="album-confirm-btn" onclick="confirmCreateAlbum()" disabled>创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧悬浮按钮 -->
+    <div class="fab-container">
+        <button class="fab fab-upload" onclick="openUploadModal()">
+            <span class="fab-tooltip">上传图片</span>+
+        </button>
+        <button class="fab fab-album" onclick="openAlbumCreateModal()">
+            <span class="fab-tooltip">创建相册</span>&#128218;
+        </button>
     </div>
 
     <div class="toast" id="toast"></div>
 
     <script>
         // ======================================
-        // 👇 你需要自己配置的部分，按下面的说明填好就能用
+        // 配置
         // ======================================
-        const SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
-        const SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
-        const ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe"; // 管理员密码
-        const STORAGE_BUCKET = "images"; // 存储桶名字，默认images就行
+        var SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
+        var SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
+        var ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe";
+        var STORAGE_BUCKET = "images";
+        var DEFAULT_UPLOADER_NAME = "匿名用户";
+        var COMPRESS_MAX_WIDTH = 1200;
+        var COMPRESS_QUALITY = 0.8;
 
-        // 安全读写 localStorage（兼容 Edge Tracking Prevention）
+        // ======================================
+        // 工具函数
+        // ======================================
         function safeGet(key, fallback) {
             try { return localStorage.getItem(key) || fallback; } catch(e) { return fallback; }
         }
         function safeSet(key, val) {
             try { localStorage.setItem(key, val); } catch(e) {}
         }
-
-        // 用户唯一标识（本地生成，用来防重复点赞、判断自己的图片）
-        let userId = safeGet('userId', null);
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substr(2, 9);
-            safeSet('userId', userId);
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+        function escapeAttr(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+        function showToast(msg) {
+            var toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(function() { toast.style.display = 'none'; }, 2500);
         }
 
-        // 已点赞的图片ID
-        let likedIds = JSON.parse(safeGet('likedIds', '[]'));
-        // 是否是管理员
-        let isAdmin = safeGet('isAdmin', 'false') === 'true';
-
-        // 初始化Supabase
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // 页面加载完成
-        document.addEventListener('DOMContentLoaded', function() {
-            // Tab切换
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-                    const tabName = this.dataset.tab;
-                    if (tabName === 'home') {
-                        document.getElementById('home-panel').style.display = 'block';
-                        document.getElementById('ranking-panel').style.display = 'none';
-                    } else {
-                        document.getElementById('home-panel').style.display = 'none';
-                        document.getElementById('ranking-panel').style.display = 'block';
-                        loadRanking();
-                    }
-                });
+        // ======================================
+        // 图片压缩（Canvas 方式，节省带宽）
+        // ======================================
+        function compressImage(file, maxWidth, quality) {
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var img = new Image();
+                    img.onload = function() {
+                        if (img.width <= maxWidth && file.size < 500 * 1024) {
+                            // 不需要压缩
+                            resolve(file);
+                            return;
+                        }
+                        var canvas = document.createElement('canvas');
+                        var w = img.width;
+                        var h = img.height;
+                        if (w > maxWidth) {
+                            h = Math.round(h * maxWidth / w);
+                            w = maxWidth;
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvas.toBlob(function(blob) {
+                            if (blob) {
+                                var compressed = new File([blob], file.name, { type: blob.type });
+                                resolve(compressed);
+                            } else {
+                                resolve(file);
+                            }
+                        }, file.type || 'image/jpeg', quality);
+                    };
+                    img.onerror = function() { resolve(file); };
+                    img.src = e.target.result;
+                };
+                reader.onerror = function() { resolve(file); };
+                reader.readAsDataURL(file);
             });
+        }
 
-            // 文件上传
-            document.getElementById('file-input').addEventListener('change', uploadFiles);
-
-            // 模态框关闭
-            document.getElementById('image-modal').addEventListener('click', function(e) {
-                if (e.target === this) closeModal();
-            });
-
-            // 加载首页图片
-            loadImages();
-
-            // 如果已经是管理员，更新状态
-            if (isAdmin) {
-                showToast('已进入管理模式');
+        // ======================================
+        // 懒加载（减少不必要的带宽消耗）
+        // ======================================
+        var lazyObserver = null;
+        function setupLazyLoad() {
+            if ('IntersectionObserver' in window) {
+                lazyObserver = new IntersectionObserver(function(entries) {
+                    entries.forEach(function(entry) {
+                        if (entry.isIntersecting) {
+                            var img = entry.target;
+                            if (img.dataset.src) {
+                                img.src = img.dataset.src;
+                                delete img.dataset.src;
+                            }
+                            lazyObserver.unobserve(img);
+                        }
+                    });
+                }, { rootMargin: '200px' });
             }
-        });
-
-        // 加载首页（时间排序）
-        async function loadImages() {
-            const container = document.getElementById('home-images');
-            container.innerHTML = '<div class="loading">加载中...</div>';
-
-            try {
-                const { data, error } = await supabaseClient
-                    .from('images')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                renderImages(data, container);
-            } catch (e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+        }
+        function lazyLoadImage(imgEl, src) {
+            if (lazyObserver) {
+                imgEl.dataset.src = src;
+                lazyObserver.observe(imgEl);
+            } else {
+                imgEl.src = src;
             }
         }
 
-        // 加载排行榜（点赞排序）
-        async function loadRanking() {
-            const container = document.getElementById('ranking-images');
-            container.innerHTML = '<div class="loading">加载中...</div>';
+        // ======================================
+        // 用户系统
+        // ======================================
+        var currentUser = null; // { id, nickname }
+        var isWhitelisted = false;
 
+        function loadUserSession() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('images')
-                    .select('*')
-                    .order('like_count', { ascending: false });
-
-                if (error) throw error;
-                renderImages(data, container);
-            } catch (e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
-            }
+                var saved = localStorage.getItem('currentUser');
+                if (saved) {
+                    currentUser = JSON.parse(saved);
+                    updateUserUI();
+                    checkWhitelist();
+                }
+            } catch(e) {}
         }
 
-        // 渲染图片列表
-        function renderImages(images, container) {
-            if (images.length === 0) {
-                container.innerHTML = '<div class="loading">还没有图片，快来上传第一张吧~</div>';
+        function updateUserUI() {
+            var badge = document.getElementById('user-badge');
+            var authBtn = document.getElementById('auth-btn');
+            if (currentUser) {
+                badge.textContent = currentUser.nickname || currentUser.id;
+                badge.style.display = 'inline-block';
+                authBtn.textContent = '退出';
+                authBtn.classList.add('user-active');
+            } else {
+                badge.style.display = 'none';
+                authBtn.textContent = '登录';
+                authBtn.classList.remove('user-active');
+            }
+            updateWhitelistTips();
+        }
+
+        function updateWhitelistTips() {
+            var showTip = currentUser && !isWhitelisted && !isAdmin;
+            document.getElementById('not-wl-tip-home').style.display = showTip ? 'block' : 'none';
+            document.getElementById('not-wl-tip-albums').style.display = showTip ? 'block' : 'none';
+        }
+
+        function checkWhitelist() {
+            if (!currentUser) { isWhitelisted = false; updateWhitelistTips(); return; }
+            supabaseClient.from('whitelist').select('user_id').eq('user_id', currentUser.id)
+            .then(function(r) {
+                isWhitelisted = !!(r.data && r.data.length > 0);
+                updateWhitelistTips();
+            }).catch(function() { isWhitelisted = false; updateWhitelistTips(); });
+        }
+
+        function openAuthModal() {
+            // 如果已登录，点击则退出
+            if (currentUser) {
+                if (!confirm('确定要退出登录吗？')) return;
+                currentUser = null;
+                isWhitelisted = false;
+                try { localStorage.removeItem('currentUser'); } catch(e) {}
+                updateUserUI();
+                showToast('已退出登录');
                 return;
             }
-
-            container.innerHTML = '';
-            images.forEach(img => {
-                const id = img.id;
-                const url = img.url;
-                const likeCount = img.like_count || 0;
-                const uploaderId = img.uploader_id;
-                const isLiked = likedIds.includes(id);
-                const canDelete = isAdmin || uploaderId === userId;
-
-                const card = document.createElement('div');
-                card.className = 'image-card';
-                card.innerHTML = `
-                    <img src="${url}" alt="图片" onclick="openModal('${url}')">
-                    <button class="delete-btn ${canDelete ? 'show' : ''}" onclick="deleteImage('${id}', '${url}')">&times;</button>
-                    <div class="image-info">
-                        <button class="like-btn ${isLiked ? 'liked' : ''}" onclick="likeImage('${id}', this)">
-                            ❤️ ${likeCount}
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pwd').value = '';
+            document.getElementById('reg-id').value = '';
+            document.getElementById('reg-nickname').value = '';
+            document.getElementById('reg-pwd').value = '';
+            switchAuthTab('login');
+            document.getElementById('auth-modal').classList.add('show');
         }
 
-        // 上传文件
-        async function uploadFiles(e) {
-            const files = e.target.files;
-            if (files.length === 0) return;
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.remove('show');
+        }
 
-            showToast('正在上传...');
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(function(t) {
+                t.classList.toggle('active', t.dataset.auth === tab);
+            });
+            document.getElementById('auth-login-form').classList.toggle('active', tab === 'login');
+            document.getElementById('auth-register-form').classList.toggle('active', tab === 'register');
+        }
 
-            for (let file of files) {
-                try {
-                    // 生成唯一文件名，防止重名
-                    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${file.name}`;
-                    
-                    // 上传到Supabase存储
-                    const { data: uploadData, error: uploadError } = await supabaseClient
-                        .storage
-                        .from(STORAGE_BUCKET)
-                        .upload(fileName, file);
+        function doRegister() {
+            var id = document.getElementById('reg-id').value.trim();
+            var nickname = document.getElementById('reg-nickname').value.trim();
+            var pwd = document.getElementById('reg-pwd').value;
 
-                    if (uploadError) throw uploadError;
+            if (!id) { showToast('请输入用户ID'); return; }
+            if (id.length < 2) { showToast('ID至少2个字符'); return; }
+            if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(id)) { showToast('ID只允许字母、数字、下划线、中文'); return; }
+            if (!pwd || pwd.length < 3) { showToast('密码至少3个字符'); return; }
 
-                    // 获取公共访问URL
-                    const { data: { publicUrl } } = supabaseClient
-                        .storage
-                        .from(STORAGE_BUCKET)
-                        .getPublicUrl(fileName);
-
-                    // 插入数据库记录
-                    const { error: insertError } = await supabaseClient
-                        .from('images')
-                        .insert([
-                            {
-                                url: publicUrl,
-                                uploader_id: userId,
-                                like_count: 0
-                            }
-                        ]);
-
-                    if (insertError) throw insertError;
-
-                } catch (err) {
-                    showToast('上传失败: ' + err.message);
+            supabaseClient.from('users').select('id').eq('id', id)
+            .then(function(r) {
+                if (r.data && r.data.length > 0) {
+                    showToast('该ID已被注册');
+                    return false;
+                }
+                return supabaseClient.from('users').insert([{
+                    id: id,
+                    nickname: nickname || id,
+                    password_hash: simpleHash(pwd)
+                }]);
+            }).then(function(r) {
+                if (r === false) return;
+                if (r && r.error) {
+                    if (r.error.message && r.error.message.indexOf('does not exist') !== -1) {
+                        showToast('用户表尚未创建，请联系管理员');
+                        console.error('users 表不存在');
+                    } else {
+                        throw r.error;
+                    }
                     return;
                 }
-            }
-
-            showToast('上传成功！');
-            loadImages();
-            // 清空input
-            document.getElementById('file-input').value = '';
+                currentUser = { id: id, nickname: nickname || id };
+                try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
+                updateUserUI();
+                closeAuthModal();
+                showToast('注册成功！请等待管理员将你加入白名单');
+                checkWhitelist();
+            }).catch(function(e) {
+                console.error('Register error:', e);
+                showToast('注册失败: ' + (e.message || '未知错误'));
+            });
         }
 
-        // 点赞
-        async function likeImage(imageId, btn) {
-            if (likedIds.includes(imageId)) {
-                showToast('你已经点过赞啦');
-                return;
-            }
+        function doLogin() {
+            var id = document.getElementById('login-id').value.trim();
+            var pwd = document.getElementById('login-pwd').value;
+            if (!id || !pwd) { showToast('请输入ID和密码'); return; }
 
-            try {
-                // 先获取当前点赞数
-                const { data: img, error: getError } = await supabaseClient
-                    .from('images')
-                    .select('like_count')
-                    .eq('id', imageId)
-                    .single();
-
-                if (getError) throw getError;
-
-                // 更新点赞数
-                const { error: updateError } = await supabaseClient
-                    .from('images')
-                    .update({ like_count: img.like_count + 1 })
-                    .eq('id', imageId);
-
-                if (updateError) throw updateError;
-
-                // 本地记录已点赞
-                likedIds.push(imageId);
-                safeSet('likedIds', JSON.stringify(likedIds));
-
-                // 更新UI
-                btn.classList.add('liked');
-                btn.innerText = '❤️ ' + (img.like_count + 1);
-
-                showToast('点赞成功！');
-            } catch (e) {
-                showToast('点赞失败: ' + e.message);
-            }
+            supabaseClient.from('users').select('*').eq('id', id).eq('password_hash', simpleHash(pwd))
+            .then(function(r) {
+                if (r.data && r.data.length > 0) {
+                    currentUser = { id: r.data[0].id, nickname: r.data[0].nickname || r.data[0].id };
+                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
+                    updateUserUI();
+                    closeAuthModal();
+                    showToast('登录成功，欢迎 ' + currentUser.nickname);
+                    checkWhitelist();
+                } else {
+                    showToast('ID或密码错误');
+                }
+            }).catch(function(e) {
+                console.error('Login error:', e);
+                showToast('登录失败: ' + (e.message || '未知错误'));
+            });
         }
 
-        // 删除图片
-        async function deleteImage(imageId, url) {
-            if (!confirm('确定要删除这张图片吗？')) return;
+        // 简单哈希（前端场景够用，非密码学安全）
+        function simpleHash(str) {
+            var hash = 0;
+            for (var i = 0; i < str.length; i++) {
+                var c = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + c;
+                hash = hash & hash;
+            }
+            return 'h_' + Math.abs(hash).toString(36);
+        }
 
-            try {
-                // 从URL里提取文件名
-                const fileName = url.split('/').pop();
+        // ======================================
+        // 管理员系统
+        // ======================================
+        var isAdmin = safeGet('isAdmin', 'false') === 'true';
 
-                // 删除存储里的文件
-                const { error: storageError } = await supabaseClient
-                    .storage
-                    .from(STORAGE_BUCKET)
-                    .remove([fileName]);
-
-                if (storageError) console.warn('文件删除警告:', storageError);
-
-                // 删除数据库记录
-                const { error: dbError } = await supabaseClient
-                    .from('images')
-                    .delete()
-                    .eq('id', imageId);
-
-                if (dbError) throw dbError;
-
-                showToast('删除成功！');
-                loadImages();
-                loadRanking();
-            } catch (e) {
-                showToast('删除失败: ' + e.message);
+        function toggleAdminBar() {
+            var bar = document.getElementById('admin-bar');
+            var panel = document.getElementById('admin-panel');
+            var btn = document.getElementById('admin-toggle-btn');
+            if (isAdmin) {
+                isAdmin = false;
+                safeSet('isAdmin', 'false');
+                bar.classList.remove('show');
+                panel.style.display = 'none';
+                btn.classList.remove('active');
+                document.getElementById('admin-pwd').placeholder = '输入管理员密码';
+                document.getElementById('admin-pwd').disabled = false;
+                document.getElementById('admin-pwd').value = '';
+                showToast('已退出管理模式');
+                refreshCurrentView();
+            } else {
+                bar.classList.toggle('show');
             }
         }
 
-        // 管理员登录
         function adminLogin() {
-            const pwd = document.getElementById('admin-pwd').value;
+            var pwd = document.getElementById('admin-pwd').value;
             if (pwd === ADMIN_PASSWORD) {
                 isAdmin = true;
                 safeSet('isAdmin', 'true');
-                showToast('管理员登录成功，你可以删除任意图片了');
-                loadImages();
+                showToast('管理员登录成功');
+                document.getElementById('admin-toggle-btn').classList.add('active');
+                document.getElementById('admin-pwd').placeholder = '已登录管理';
+                document.getElementById('admin-pwd').disabled = true;
+                document.getElementById('admin-bar').classList.remove('show');
+                document.getElementById('admin-panel').style.display = 'flex';
+                loadWhitelist();
+                refreshCurrentView();
             } else {
                 showToast('密码错误');
             }
         }
 
-        // 打开大图
-        function openModal(url) {
+        // ======================================
+        // 白名单管理
+        // ======================================
+        function searchUsers() {
+            var query = document.getElementById('wl-search-input').value.trim();
+            if (!query) { showToast('请输入搜索关键词'); return; }
+
+            var resultsDiv = document.getElementById('wl-search-results');
+            resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">搜索中...</div>';
+            resultsDiv.style.display = 'block';
+
+            // 搜索用户ID或昵称
+            supabaseClient.from('users').select('id, nickname').or('id.ilike.%' + query + '%,nickname.ilike.%' + query + '%').limit(20)
+            .then(function(r) {
+                if (r.error) throw r.error;
+                var users = r.data || [];
+                if (users.length === 0) {
+                    resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">未找到用户</div>';
+                    return;
+                }
+
+                // 获取当前白名单
+                return supabaseClient.from('whitelist').select('user_id').then(function(wlR) {
+                    var wlIds = {};
+                    if (wlR.data) wlR.data.forEach(function(w) { wlIds[w.user_id] = true; });
+
+                    var html = '';
+                    users.forEach(function(u) {
+                        var inWL = wlIds[u.id];
+                        html += '<div class="search-result-item">' +
+                            '<div><span class="sr-id">' + escapeHtml(u.id) + '</span>' +
+                            '<span class="sr-name">(' + escapeHtml(u.nickname || u.id) + ')</span></div>' +
+                            (inWL
+                                ? '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(u.id) + '\')">移出白名单</button>'
+                                : '<button class="btn-add-wl" onclick="addToWhitelist(\'' + escapeAttr(u.id) + '\',\'' + escapeAttr(u.nickname || u.id) + '\')">加入白名单</button>'
+                            ) +
+                        '</div>';
+                    });
+                    resultsDiv.innerHTML = html;
+                });
+            }).catch(function(e) {
+                resultsDiv.innerHTML = '<div style="padding:10px;color:red;">搜索失败</div>';
+                console.error('Search error:', e);
+            });
+        }
+
+        function addToWhitelist(userId, nickname) {
+            supabaseClient.from('whitelist').insert([{ user_id: userId }])
+            .then(function(r) {
+                if (r.error) {
+                    if (r.error.code === '23505') { showToast('该用户已在白名单中'); }
+                    else throw r.error;
+                    return;
+                }
+                showToast('已将 ' + nickname + ' 加入白名单');
+                searchUsers(); // 刷新搜索结果
+                loadWhitelist();
+            }).catch(function(e) {
+                showToast('操作失败: ' + (e.message || ''));
+            });
+        }
+
+        function removeFromWhitelist(userId) {
+            if (!confirm('确定要将该用户移出白名单吗？')) return;
+            supabaseClient.from('whitelist').delete().eq('user_id', userId)
+            .then(function(r) {
+                if (r.error) throw r.error;
+                showToast('已移出白名单');
+                searchUsers();
+                loadWhitelist();
+            }).catch(function(e) {
+                showToast('操作失败');
+            });
+        }
+
+        function loadWhitelist() {
+            var listDiv = document.getElementById('wl-current-list');
+            supabaseClient.from('whitelist').select('user_id, added_at').order('added_at', { ascending: true })
+            .then(function(r) {
+                if (r.error) {
+                    listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:red;font-size:12px;">加载失败</span>';
+                    return;
+                }
+                var items = r.data || [];
+                if (items.length === 0) {
+                    listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:#999;font-size:12px;">暂无用户</span>';
+                    return;
+                }
+                var html = '<strong>当前白名单（' + items.length + '人）：</strong><br>';
+                items.forEach(function(item) {
+                    html += '<div class="wl-item"><span>' + escapeHtml(item.user_id) + '</span>' +
+                        '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(item.user_id) + '\')">移除</button></div>';
+                });
+                listDiv.innerHTML = html;
+            });
+        }
+
+        // ======================================
+        // 状态
+        // ======================================
+        var currentTab = 'home';
+        var currentAlbumId = null;
+        var pendingFiles = [];
+        var pendingAlbumCover = null;
+        var likedIds = JSON.parse(safeGet('likedIds', '[]'));
+
+        // 初始化 Supabase
+        var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ======================================
+        // 页面初始化
+        // ======================================
+        document.addEventListener('DOMContentLoaded', function() {
+            setupLazyLoad();
+            loadUserSession();
+
+            // Tab 切换
+            document.querySelectorAll('.tab').forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    var tabName = this.dataset.tab;
+                    if (tabName === 'albums' && currentTab === 'albums' && currentAlbumId) {
+                        backToAlbumList();
+                        return;
+                    }
+                    switchTab(tabName);
+                });
+            });
+
+            // 文件选择
+            document.getElementById('file-input-image').addEventListener('change', function(e) {
+                handleFileSelect(e.target.files, 'image');
+            });
+            document.getElementById('file-input-album-cover').addEventListener('change', function(e) {
+                handleFileSelect(e.target.files, 'cover');
+            });
+
+            // 拖拽上传
+            setupDragDrop('upload-drop', 'image');
+            setupDragDrop('album-cover-drop', 'cover');
+
+            // 弹窗关闭
+            document.getElementById('image-modal').addEventListener('click', function(e) {
+                if (e.target === this || e.target.classList.contains('close')) closeModal();
+            });
+            document.getElementById('upload-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeUploadModal();
+            });
+            document.getElementById('album-create-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAlbumCreateModal();
+            });
+            document.getElementById('auth-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeAuthModal();
+            });
+
+            // 管理员状态恢复
+            if (isAdmin) {
+                document.getElementById('admin-toggle-btn').classList.add('active');
+                document.getElementById('admin-pwd').placeholder = '已登录管理';
+                document.getElementById('admin-pwd').disabled = true;
+                document.getElementById('admin-panel').style.display = 'flex';
+                loadWhitelist();
+            }
+
+            loadImages();
+        });
+
+        function setupDragDrop(dropId, type) {
+            var dz = document.getElementById(dropId);
+            dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
+            dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
+            dz.addEventListener('drop', function(e) {
+                e.preventDefault(); dz.classList.remove('dragover');
+                handleFileSelect(e.dataTransfer.files, type);
+            });
+        }
+
+        // ======================================
+        // Tab 切换
+        // ======================================
+        function switchTab(tabName) {
+            currentTab = tabName;
+            currentAlbumId = null;
+            document.querySelectorAll('.tab').forEach(function(t) {
+                t.classList.toggle('active', t.dataset.tab === tabName);
+            });
+            document.getElementById('home-panel').style.display = tabName === 'home' ? 'block' : 'none';
+            document.getElementById('albums-panel').style.display = tabName === 'albums' ? 'block' : 'none';
+            document.getElementById('ranking-panel').style.display = tabName === 'ranking' ? 'block' : 'none';
+            if (tabName === 'home') loadImages();
+            else if (tabName === 'albums') loadAlbums();
+            else if (tabName === 'ranking') loadRanking();
+        }
+
+        function refreshCurrentView() {
+            if (currentTab === 'home') loadImages();
+            else if (currentTab === 'albums') {
+                if (currentAlbumId) loadAlbumDetail(currentAlbumId);
+                else loadAlbums();
+            }
+            else if (currentTab === 'ranking') loadRanking();
+        }
+
+        // ======================================
+        // 上传前检查权限
+        // ======================================
+        function checkUploadPermission() {
+            if (isAdmin) return true;
+            if (!currentUser) {
+                showToast('请先登录');
+                openAuthModal();
+                return false;
+            }
+            if (!isWhitelisted) {
+                showToast('你不在白名单中，无法上传');
+                return false;
+            }
+            return true;
+        }
+
+        // ======================================
+        // 上传图片
+        // ======================================
+        function openUploadModal() {
+            if (!checkUploadPermission()) return;
+            pendingFiles = [];
+            document.getElementById('upload-file-list').innerHTML = '';
+            document.getElementById('upload-album-select').innerHTML = '<option value="">不放入相册</option>';
+            document.getElementById('upload-confirm-btn').disabled = true;
+            document.getElementById('upload-progress').classList.remove('show');
+            document.getElementById('upload-modal').classList.add('show');
+            document.getElementById('file-input-image').value = '';
+            loadAlbumOptions();
+        }
+
+        function loadAlbumOptions() {
+            supabaseClient.from('albums').select('id, name').order('created_at', { ascending: false })
+            .then(function(result) {
+                if (result.data && result.data.length > 0) {
+                    var sel = document.getElementById('upload-album-select');
+                    sel.innerHTML = '<option value="">不放入相册</option>';
+                    result.data.forEach(function(a) {
+                        sel.innerHTML += '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>';
+                    });
+                }
+            }).catch(function() {});
+        }
+
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.remove('show');
+            document.getElementById('file-input-image').value = '';
+            pendingFiles = [];
+        }
+
+        function handleFileSelect(files, type) {
+            var filtered = [];
+            for (var i = 0; i < files.length; i++) {
+                if (files[i].type && files[i].type.indexOf('image/') === 0) filtered.push(files[i]);
+            }
+            if (type === 'image') {
+                pendingFiles = filtered;
+                var listEl = document.getElementById('upload-file-list');
+                if (pendingFiles.length > 0) {
+                    var html = '';
+                    for (var j = 0; j < pendingFiles.length; j++) {
+                        html += '<div>' + escapeHtml(pendingFiles[j].name) + ' (' + (pendingFiles[j].size / 1024).toFixed(1) + ' KB)</div>';
+                    }
+                    listEl.innerHTML = html;
+                    document.getElementById('upload-confirm-btn').disabled = false;
+                } else {
+                    listEl.innerHTML = '';
+                    document.getElementById('upload-confirm-btn').disabled = true;
+                }
+            } else if (type === 'cover') {
+                if (filtered.length > 0) {
+                    pendingAlbumCover = filtered[0];
+                    document.getElementById('album-cover-file-list').innerHTML = '<div>' + escapeHtml(pendingAlbumCover.name) + '</div>';
+                    document.getElementById('album-confirm-btn').disabled = false;
+                }
+            }
+        }
+
+        function confirmUpload() {
+            if (pendingFiles.length === 0) return;
+
+            var albumId = document.getElementById('upload-album-select').value;
+            var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+            var uploaderId = currentUser ? currentUser.id : null;
+
+            var btn = document.getElementById('upload-confirm-btn');
+            btn.disabled = true;
+            var progressEl = document.getElementById('upload-progress');
+            var progressBar = document.getElementById('upload-progress-bar');
+            progressEl.classList.add('show');
+
+            var success = 0;
+            var fail = 0;
+            var idx = 0;
+
+            function uploadNext() {
+                if (idx >= pendingFiles.length) {
+                    progressEl.classList.remove('show');
+                    closeUploadModal();
+                    if (fail === 0) showToast('成功上传 ' + success + ' 张图片');
+                    else showToast('上传完成：' + success + ' 成功，' + fail + ' 失败');
+                    refreshCurrentView();
+                    return;
+                }
+
+                var file = pendingFiles[idx];
+                // 先压缩
+                compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+                    var sizeDiff = file.size - compressed.size;
+                    if (sizeDiff > 0) {
+                        console.log('压缩 ' + file.name + ': ' + (file.size/1024).toFixed(1) + 'KB -> ' + (compressed.size/1024).toFixed(1) + 'KB (节省' + (sizeDiff/file.size*100).toFixed(0) + '%)');
+                    }
+                    var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
+
+                    return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
+                        if (uploadResult.error) throw uploadResult.error;
+                        var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+                        var record = {
+                            url: publicUrl,
+                            uploader_id: uploaderId,
+                            uploader_name: uploaderName,
+                            like_count: 0
+                        };
+                        if (albumId) record.album_id = albumId;
+                        return supabaseClient.from('images').insert([record]);
+                    }).then(function(insertResult) {
+                        if (insertResult && insertResult.error) throw insertResult.error;
+                        success++;
+                    });
+                }).catch(function(err) {
+                    console.error('Upload fail:', err);
+                    fail++;
+                }).finally(function() {
+                    idx++;
+                    progressBar.style.width = (idx / pendingFiles.length * 100) + '%';
+                    uploadNext();
+                });
+            }
+
+            uploadNext();
+        }
+
+        // ======================================
+        // 创建相册
+        // ======================================
+        function openAlbumCreateModal() {
+            if (!checkUploadPermission()) return;
+            pendingAlbumCover = null;
+            document.getElementById('album-cover-file-list').innerHTML = '';
+            document.getElementById('album-name-input').value = '';
+            document.getElementById('album-confirm-btn').disabled = true;
+            document.getElementById('album-progress').classList.remove('show');
+            document.getElementById('album-create-modal').classList.add('show');
+            document.getElementById('file-input-album-cover').value = '';
+        }
+
+        function closeAlbumCreateModal() {
+            document.getElementById('album-create-modal').classList.remove('show');
+            document.getElementById('file-input-album-cover').value = '';
+            pendingAlbumCover = null;
+        }
+
+        function confirmCreateAlbum() {
+            var albumName = document.getElementById('album-name-input').value.trim();
+            if (!albumName) { showToast('请输入相册名称'); return; }
+
+            var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+            var uploaderId = currentUser ? currentUser.id : null;
+
+            var btn = document.getElementById('album-confirm-btn');
+            btn.disabled = true;
+            var coverUrl = null;
+
+            function doCreate() {
+                var record = {
+                    name: albumName,
+                    cover_url: coverUrl,
+                    uploader_id: uploaderId,
+                    uploader_name: uploaderName
+                };
+
+                supabaseClient.from('albums').insert([record]).then(function(result) {
+                    if (result.error) {
+                        if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                            showToast('请先在 Supabase 创建 albums 表');
+                        } else {
+                            throw result.error;
+                        }
+                    } else {
+                        closeAlbumCreateModal();
+                        showToast('相册「' + albumName + '」创建成功');
+                        if (currentTab === 'albums') loadAlbums();
+                    }
+                }).catch(function(err) {
+                    console.error('Create album fail:', err);
+                    showToast('创建失败: ' + (err.message || '未知错误'));
+                }).finally(function() {
+                    btn.disabled = false;
+                    document.getElementById('album-progress').classList.remove('show');
+                });
+            }
+
+            if (pendingAlbumCover) {
+                var progressEl = document.getElementById('album-progress');
+                var progressBar = document.getElementById('album-progress-bar');
+                progressEl.classList.add('show');
+                progressBar.style.width = '30%';
+
+                compressImage(pendingAlbumCover, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+                    var fileName = 'album_cover_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + pendingAlbumCover.name;
+                    return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed);
+                }).then(function(uploadResult) {
+                    if (uploadResult.error) throw uploadResult.error;
+                    progressBar.style.width = '70%';
+                    var fileName = uploadResult.data.path;
+                    coverUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+                }).catch(function(err) {
+                    console.warn('Cover upload failed:', err);
+                }).finally(function() {
+                    doCreate();
+                });
+            } else {
+                doCreate();
+            }
+        }
+
+        // ======================================
+        // 加载数据
+        // ======================================
+        function loadImages() {
+            var container = document.getElementById('home-images');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            supabaseClient.from('images').select('*').order('created_at', { ascending: false })
+            .then(function(result) {
+                if (result.error) throw result.error;
+                renderImages(result.data || [], container);
+            }).catch(function(e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            });
+        }
+
+        function loadRanking() {
+            var container = document.getElementById('ranking-images');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            supabaseClient.from('images').select('*').order('like_count', { ascending: false })
+            .then(function(result) {
+                if (result.error) throw result.error;
+                renderImages(result.data || [], container);
+            }).catch(function(e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            });
+        }
+
+        function loadAlbums() {
+            var container = document.getElementById('albums-grid');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            document.getElementById('album-list-view').style.display = 'block';
+            document.getElementById('album-detail-view').style.display = 'none';
+
+            supabaseClient.from('albums').select('*').order('created_at', { ascending: false })
+            .then(function(result) {
+                if (result.error) {
+                    if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                        container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">相册功能尚未启用<br>请先在 Supabase 创建 albums 表</div></div>';
+                        return;
+                    }
+                    throw result.error;
+                }
+                var albums = result.data || [];
+                if (albums.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">还没有相册，点击右侧按钮创建吧</div></div>';
+                    return;
+                }
+                var promises = albums.map(function(album) {
+                    return supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', album.id)
+                    .then(function(r) { album.image_count = r.count || 0; return album; });
+                });
+                return Promise.all(promises);
+            }).then(function(albums) {
+                if (albums) renderAlbums(albums, container);
+            }).catch(function(e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            });
+        }
+
+        function renderAlbums(albums, container) {
+            container.innerHTML = '';
+            for (var i = 0; i < albums.length; i++) {
+                (function(album) {
+                    var card = document.createElement('div');
+                    card.className = 'album-card';
+                    card.onclick = function() { openAlbumDetail(album.id, album.name); };
+                    var coverHTML = album.cover_url
+                        ? '<div class="album-cover"><img src="' + escapeAttr(album.cover_url) + '" alt="' + escapeAttr(album.name) + '" loading="lazy"></div>'
+                        : '<div class="album-cover">&#128444;&#65039;</div>';
+                    var uploaderName = album.uploader_name || DEFAULT_UPLOADER_NAME;
+                    card.innerHTML = coverHTML +
+                        '<div class="album-info">' +
+                            '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
+                            '<div class="album-meta">' + (album.image_count || 0) + ' 张图片</div>' +
+                            '<div class="album-uploader">by ' + escapeHtml(uploaderName) + '</div>' +
+                        '</div>';
+                    if (isAdmin) {
+                        var delBtn = document.createElement('button');
+                        delBtn.className = 'delete-btn show';
+                        delBtn.innerHTML = '&times;';
+                        delBtn.style.zIndex = '10';
+                        delBtn.onclick = function(e) { e.stopPropagation(); deleteAlbum(album.id, album.name); };
+                        card.appendChild(delBtn);
+                    }
+                    container.appendChild(card);
+                })(albums[i]);
+            }
+        }
+
+        function openAlbumDetail(albumId, albumName) {
+            currentAlbumId = albumId;
+            document.getElementById('album-list-view').style.display = 'none';
+            document.getElementById('album-detail-view').style.display = 'block';
+            document.getElementById('detail-album-name').textContent = albumName;
+            document.querySelectorAll('.tab').forEach(function(t) {
+                t.classList.toggle('active', t.dataset.tab === 'albums');
+            });
+            loadAlbumDetail(albumId);
+        }
+
+        function loadAlbumDetail(albumId) {
+            var container = document.getElementById('album-detail-images');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            supabaseClient.from('images').select('*').eq('album_id', albumId).order('created_at', { ascending: false })
+            .then(function(result) {
+                if (result.error) throw result.error;
+                document.getElementById('detail-album-desc').textContent = (result.data || []).length + ' 张图片';
+                renderImages(result.data || [], container);
+            }).catch(function(e) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            });
+        }
+
+        function backToAlbumList() {
+            currentAlbumId = null;
+            document.getElementById('album-list-view').style.display = 'block';
+            document.getElementById('album-detail-view').style.display = 'none';
+            loadAlbums();
+        }
+
+        function deleteAlbum(albumId, albumName) {
+            if (!confirm('确定要删除相册「' + albumName + '」吗？')) return;
+            supabaseClient.from('albums').delete().eq('id', albumId)
+            .then(function(result) {
+                if (result.error) throw result.error;
+                showToast('相册已删除');
+                loadAlbums();
+            }).catch(function(e) {
+                showToast('删除失败: ' + e.message);
+            });
+        }
+
+        // ======================================
+        // 渲染图片列表（含懒加载）
+        // ======================================
+        function renderImages(images, container) {
+            if (images.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">&#128247;</div><div class="text">还没有图片，快来上传第一张吧~</div></div>';
+                return;
+            }
+            container.innerHTML = '';
+            for (var i = 0; i < images.length; i++) {
+                (function(img) {
+                    var id = img.id;
+                    var url = img.url;
+                    var likeCount = img.like_count || 0;
+                    var uploaderId = img.uploader_id;
+                    var uploaderName = img.uploader_name || DEFAULT_UPLOADER_NAME;
+                    var isLiked = likedIds.indexOf(id) !== -1;
+                    var canDelete = isAdmin || (currentUser && uploaderId === currentUser.id);
+
+                    var card = document.createElement('div');
+                    card.className = 'image-card';
+
+                    var imgEl = document.createElement('img');
+                    imgEl.alt = '图片';
+                    // 懒加载：使用 data-src，滚动到可视区域时才加载
+                    lazyLoadImage(imgEl, url);
+                    imgEl.onclick = function() { openModal(url, uploaderName); };
+                    card.appendChild(imgEl);
+
+                    if (canDelete) {
+                        var delBtn = document.createElement('button');
+                        delBtn.className = 'delete-btn show';
+                        delBtn.innerHTML = '&times;';
+                        delBtn.onclick = function() { deleteImage(id, url); };
+                        card.appendChild(delBtn);
+                    }
+
+                    var infoDiv = document.createElement('div');
+                    infoDiv.className = 'image-info';
+
+                    var nameSpan = document.createElement('span');
+                    nameSpan.className = 'image-uploader-name';
+                    nameSpan.title = uploaderName;
+                    nameSpan.textContent = uploaderName;
+                    infoDiv.appendChild(nameSpan);
+
+                    var likeBtn = document.createElement('button');
+                    likeBtn.className = 'like-btn' + (isLiked ? ' liked' : '');
+                    likeBtn.innerHTML = '&#10084; ' + likeCount;
+                    likeBtn.onclick = function() { likeImage(id, likeBtn); };
+                    infoDiv.appendChild(likeBtn);
+
+                    card.appendChild(infoDiv);
+                    container.appendChild(card);
+                })(images[i]);
+            }
+        }
+
+        // ======================================
+        // 点赞
+        // ======================================
+        function likeImage(imageId, btn) {
+            if (likedIds.indexOf(imageId) !== -1) {
+                showToast('你已经点过赞啦');
+                return;
+            }
+            supabaseClient.from('images').select('like_count').eq('id', imageId).single()
+            .then(function(result) {
+                if (result.error) throw result.error;
+                return supabaseClient.from('images').update({ like_count: result.data.like_count + 1 }).eq('id', imageId);
+            }).then(function(result) {
+                if (result && result.error) throw result.error;
+                likedIds.push(imageId);
+                safeSet('likedIds', JSON.stringify(likedIds));
+                btn.classList.add('liked');
+                return supabaseClient.from('images').select('like_count').eq('id', imageId).single();
+            }).then(function(result) {
+                if (result && result.data) {
+                    btn.innerHTML = '&#10084; ' + result.data.like_count;
+                }
+                showToast('点赞成功！');
+            }).catch(function(e) {
+                showToast('点赞失败: ' + e.message);
+            });
+        }
+
+        // ======================================
+        // 删除图片
+        // ======================================
+        function deleteImage(imageId, url) {
+            if (!confirm('确定要删除这张图片吗？')) return;
+            var fileName = url.split('/').pop();
+            supabaseClient.storage.from(STORAGE_BUCKET).remove([fileName])
+            .then(function(result) {
+                if (result.error) console.warn('文件删除警告:', result.error);
+                return supabaseClient.from('images').delete().eq('id', imageId);
+            }).then(function(result) {
+                if (result.error) throw result.error;
+                showToast('删除成功！');
+                refreshCurrentView();
+            }).catch(function(e) {
+                showToast('删除失败: ' + e.message);
+            });
+        }
+
+        // ======================================
+        // 大图查看
+        // ======================================
+        function openModal(url, uploaderName) {
             document.getElementById('modal-img').src = url;
-            document.getElementById('image-modal').style.display = 'flex';
+            document.getElementById('modal-uploader').textContent = 'by ' + (uploaderName || DEFAULT_UPLOADER_NAME);
+            document.getElementById('image-modal').classList.add('show');
         }
 
-        // 关闭大图
         function closeModal() {
-            document.getElementById('image-modal').style.display = 'none';
-        }
-
-        // Toast提示
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 2000);
+            document.getElementById('image-modal').classList.remove('show');
+            document.getElementById('modal-img').src = '';
         }
     </script>
 </body>
