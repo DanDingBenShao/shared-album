@@ -53,6 +53,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             padding: 4px 10px; border-radius: 12px;
             max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
+        .bandwidth-badge {
+            font-size: 11px; color: white; background: #2196F3;
+            padding: 4px 10px; border-radius: 12px;
+            white-space: nowrap; cursor: help;
+            transition: background 0.3s;
+        }
         .header-btn {
             padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px;
             background: white; color: #666; cursor: pointer; font-size: 13px; transition: all 0.2s;
@@ -201,7 +207,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         }
         .image-uploader-name {
             font-size: 11px; color: #999; overflow: hidden;
-            text-overflow: ellipsis; white-space: nowrap; max-width: 80px;
+            text-overflow: ellipsis; white-space: nowrap; max-width: 60px;
+        }
+        .image-time {
+            font-size: 10px; color: #bbb; flex-shrink: 0;
         }
         .like-btn {
             display: flex; align-items: center; gap: 4px; cursor: pointer;
@@ -239,16 +248,47 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             align-items: center; justify-content: center;
         }
         .image-modal.show { display: flex; }
-        .image-modal img { max-width: 90%; max-height: 80%; object-fit: contain; }
+        .image-modal img { max-width: 90%; max-height: 70%; object-fit: contain; }
         .image-modal .close {
             position: absolute; top: 16px; right: 16px; color: white;
             font-size: 32px; cursor: pointer; width: 40px; height: 40px;
             display: flex; align-items: center; justify-content: center;
         }
         .image-modal .modal-uploader {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
             color: rgba(255,255,255,0.7); font-size: 14px;
         }
+        
+        /* 大图导航按钮 */
+        .modal-nav-btn {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 50px; height: 50px; border-radius: 50%;
+            background: rgba(255,255,255,0.2); color: white;
+            border: none; font-size: 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; z-index: 10;
+        }
+        .modal-nav-btn:hover { background: rgba(255,255,255,0.4); }
+        .modal-prev { left: 20px; }
+        .modal-next { right: 20px; }
+        
+        /* 大图底部操作栏 */
+        .modal-actions-bar {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 16px; align-items: center;
+            background: rgba(0,0,0,0.5); padding: 10px 20px;
+            border-radius: 30px;
+        }
+        .modal-action-btn {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 16px; border: none; border-radius: 20px;
+            background: rgba(255,255,255,0.2); color: white;
+            cursor: pointer; font-size: 14px;
+            transition: all 0.2s;
+        }
+        .modal-action-btn:hover { background: rgba(255,255,255,0.3); }
+        .modal-action-btn.liked { background: #e91e63; }
+        .modal-action-btn .like-icon { color: inherit; }
 
         /* ===== 白名单管理面板 ===== */
         .whitelist-section { margin-top: 16px; padding: 16px; background: #f9f9f9; border-radius: 12px; }
@@ -316,6 +356,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         .compress-info {
             font-size: 11px; color: #999; margin-top: 4px;
         }
+
+        /* ===== 免责声明弹窗 ===== */
+        #disclaimer-modal .modal-panel {
+            max-height: 90vh;
+        }
+        #disclaimer-modal h3 {
+            margin-bottom: 16px;
+            color: #333;
+        }
+        #disclaimer-modal .modal-actions {
+            justify-content: center;
+        }
+
     </style>
 </head>
 <body>
@@ -323,6 +376,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     <div class="header">
         <h1>极简共享相册</h1>
         <div class="header-right">
+            <span class="bandwidth-badge" id="bandwidth-badge" style="display:none;" title="今日已使用带宽"></span>
             <span class="user-badge" id="user-badge" style="display:none;"></span>
             <button class="header-btn" id="auth-btn" onclick="openAuthModal()">登录</button>
             <button class="header-btn" id="admin-toggle-btn" onclick="toggleAdminBar()">&#9881;</button>
@@ -335,7 +389,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <button onclick="adminLogin()">确认</button>
     </div>
 
-    <!-- 管理员面板（白名单管理等） -->
+    <!-- 管理员面板（白名单管理、黑名单管理等） -->
     <div class="admin-bar" id="admin-panel" style="display:none; flex-direction:column; padding:16px;">
         <div class="whitelist-section" style="width:100%;">
             <h4>&#128274; 白名单管理</h4>
@@ -347,6 +401,44 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             <div class="whitelist-current" id="wl-current-list">
                 <strong>当前白名单：</strong><br>
                 <span style="color:#999;font-size:12px;">加载中...</span>
+            </div>
+        </div>
+        
+        <div class="whitelist-section" style="width:100%; margin-top:16px;">
+            <h4>&#128683; 黑名单管理</h4>
+            <div class="whitelist-search-row">
+                <input type="text" id="bl-search-input" placeholder="输入用户ID搜索">
+                <button onclick="searchBlacklistUsers()">搜索</button>
+            </div>
+            <div class="search-results" id="bl-search-results" style="display:none;"></div>
+            <div class="whitelist-current" id="bl-current-list">
+                <strong>当前黑名单：</strong><br>
+                <span style="color:#999;font-size:12px;">加载中...</span>
+            </div>
+        </div>
+        
+        <div class="whitelist-section" style="width:100%; margin-top:16px;">
+            <h4>&#128202; 带宽使用统计（今日）</h4>
+            <div id="bandwidth-stats-list" style="max-height: 300px; overflow-y: auto;">
+                <span style="color:#999;font-size:12px;">加载中...</span>
+            </div>
+        </div>
+        
+        <div class="whitelist-section" style="width:100%; margin-top:16px;">
+            <h4>&#128267; Supabase 额度监控</h4>
+            <div style="margin-bottom: 12px;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 4px;">数据库用量</div>
+                <div style="background: #e0e0e0; border-radius: 4px; height: 20px; overflow: hidden;">
+                    <div id="db-size-bar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div id="db-size-text" style="font-size: 11px; color: #999; margin-top: 2px;">加载中...</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 4px;">存储用量</div>
+                <div style="background: #e0e0e0; border-radius: 4px; height: 20px; overflow: hidden;">
+                    <div id="storage-size-bar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div id="storage-size-text" style="font-size: 11px; color: #999; margin-top: 2px;">加载中...</div>
             </div>
         </div>
     </div>
@@ -393,8 +485,26 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     <!-- 大图查看 -->
     <div class="image-modal" id="image-modal">
         <span class="close" onclick="closeModal()">&times;</span>
+        
+        <!-- 左右切换按钮 -->
+        <button class="modal-nav-btn modal-prev" id="modal-prev" onclick="showPrevImage()">&#10094;</button>
+        <button class="modal-nav-btn modal-next" id="modal-next" onclick="showNextImage()">&#10095;</button>
+        
         <img id="modal-img" src="">
+        
         <div class="modal-uploader" id="modal-uploader"></div>
+        
+        <!-- 底部操作栏 -->
+        <div class="modal-actions-bar">
+            <button class="modal-action-btn like-btn" id="modal-like-btn">
+                <span class="like-icon">&#10084;</span>
+                <span class="like-count">0</span>
+            </button>
+            <button class="modal-action-btn delete-btn" id="modal-delete-btn" style="display:none;">
+                <span>&#128465;</span>
+                <span>删除</span>
+            </button>
+        </div>
     </div>
 
     <!-- 用户登录/注册弹窗 -->
@@ -501,996 +611,2014 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </button>
     </div>
 
+    <!-- 免责声明弹窗 -->
+    <div class="modal-overlay" id="disclaimer-modal" style="z-index: 1000;">
+        <div class="modal-panel" style="max-width: 480px;">
+            <h3>&#128203; 用户协议</h3>
+            <div style="max-height: 300px; overflow-y: auto; padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 16px; font-size: 14px; line-height: 1.6; color: #555;">
+                <p style="margin-bottom: 12px;">欢迎使用极简共享相册！在使用本网站前，请阅读并同意以下条款：</p>
+                <p style="margin-bottom: 8px;"><strong>1. 内容规范</strong></p>
+                <p style="margin-bottom: 12px; padding-left: 16px;">本人承诺不上传违法违规内容，包括但不限于色情、暴力、政治敏感、侵权等。</p>
+                <p style="margin-bottom: 8px;"><strong>2. 违规处理</strong></p>
+                <p style="margin-bottom: 12px; padding-left: 16px;">违规内容将被删除，账号可能被封禁。</p>
+                <p style="margin-bottom: 8px;"><strong>3. 使用限制</strong></p>
+                <p style="margin-bottom: 12px; padding-left: 16px;">未登录用户每日浏览额度为 5MB，登录后普通用户为 100MB，白名单用户为 300MB。</p>
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; cursor: pointer; font-size: 14px;">
+                <input type="checkbox" id="disclaimer-agree" style="width: 18px; height: 18px;">
+                <span>我已阅读并同意以上协议</span>
+            </label>
+            <div class="modal-actions">
+                <button class="btn-confirm blue" id="disclaimer-confirm-btn" onclick="confirmDisclaimer()" disabled>进入网站</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
-        // ======================================
-        // 配置
-        // ======================================
-        var SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
-        var SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
-        var ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe";
-        var STORAGE_BUCKET = "images";
-        var DEFAULT_UPLOADER_NAME = "匿名用户";
-        var COMPRESS_MAX_WIDTH = 1200;
-        var COMPRESS_QUALITY = 0.8;
+    // ======================================
+// 配置
+// ======================================
+var SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
+var SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
+var ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe";
+var STORAGE_BUCKET = "images";
+var DEFAULT_UPLOADER_NAME = "匿名用户";
+var COMPRESS_MAX_WIDTH = 1200;
+var COMPRESS_QUALITY = 0.8;
 
-        // ======================================
-        // 工具函数
-        // ======================================
-        function safeGet(key, fallback) {
-            try { return localStorage.getItem(key) || fallback; } catch(e) { return fallback; }
-        }
-        function safeSet(key, val) {
-            try { localStorage.setItem(key, val); } catch(e) {}
-        }
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-        }
-        function escapeAttr(str) {
-            if (!str) return '';
-            return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        }
-        function showToast(msg) {
-            var toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            clearTimeout(toast._timer);
-            toast._timer = setTimeout(function() { toast.style.display = 'none'; }, 2500);
-        }
+// 带宽限制配置（字节）
+var BANDWIDTH_LIMIT = {
+    GUEST: 5 * 1024 * 1024,      // 未登录用户：5MB
+    NORMAL: 100 * 1024 * 1024,   // 普通登录用户：100MB
+    WHITELIST: 300 * 1024 * 1024 // 白名单用户：300MB
+};
 
-        // ======================================
-        // 图片压缩（Canvas 方式，节省带宽）
-        // ======================================
-        function compressImage(file, maxWidth, quality) {
-            return new Promise(function(resolve, reject) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var img = new Image();
-                    img.onload = function() {
-                        if (img.width <= maxWidth && file.size < 500 * 1024) {
-                            // 不需要压缩
-                            resolve(file);
+// 分页配置
+var PAGINATION = {
+    PAGE_SIZE: 12  // 每页加载图片数量
+};
+
+
+// ======================================
+// 工具函数
+// ======================================
+function safeGet(key, fallback) {
+    try { return localStorage.getItem(key) || fallback; } catch(e) { return fallback; }
+}
+function safeSet(key, val) {
+    try { localStorage.setItem(key, val); } catch(e) {}
+}
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function showToast(msg) {
+    var toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function() { toast.style.display = 'none'; }, 2500);
+}
+// 简单哈希（前端场景够用，非密码学安全）
+function simpleHash(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + c;
+        hash = hash & hash;
+    }
+    return 'h_' + Math.abs(hash).toString(36);
+}
+
+// ======================================
+// 免责声明相关
+// ======================================
+function hasAgreedDisclaimer() {
+    return safeGet('disclaimer_agreed', '') === 'true';
+}
+function setDisclaimerAgreed() {
+    safeSet('disclaimer_agreed', 'true');
+}
+
+// ======================================
+// 带宽使用记录
+// ======================================
+function getTodayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function getBandwidthUsage(userId) {
+    var key = 'bw_' + (userId || 'guest') + '_' + getTodayKey();
+    var data = safeGet(key, '{}');
+    try {
+        var parsed = JSON.parse(data);
+        return { upload: parsed.upload || 0, download: parsed.download || 0 };
+    } catch(e) {
+        return { upload: 0, download: 0 };
+    }
+}
+function addBandwidthUsage(userId, uploadBytes, downloadBytes) {
+    var key = 'bw_' + (userId || 'guest') + '_' + getTodayKey();
+    var current = getBandwidthUsage(userId);
+    current.upload += (uploadBytes || 0);
+    current.download += (downloadBytes || 0);
+    safeSet(key, JSON.stringify(current));
+    return current;
+}
+function getBandwidthLimit(userType) {
+    if (userType === 'whitelist') return BANDWIDTH_LIMIT.WHITELIST;
+    if (userType === 'normal') return BANDWIDTH_LIMIT.NORMAL;
+    return BANDWIDTH_LIMIT.GUEST;
+}
+
+// 获取当前用户类型
+function defineCurrentUserType() {
+    if (isAdmin) return 'admin';
+    if (!currentUser) return 'guest';
+    if (isWhitelisted) return 'whitelist';
+    return 'normal';
+}
+
+// 检查带宽是否超限，返回 { allowed: boolean, remaining: number, limit: number, used: number }
+function checkBandwidthLimit(bytesNeeded) {
+    var userType = defineCurrentUserType();
+    var limit = getBandwidthLimit(userType);
+    
+    // 管理员无限制
+    if (userType === 'admin') {
+        return { allowed: true, remaining: Infinity, limit: Infinity, used: 0 };
+    }
+    
+    var userId = currentUser ? currentUser.id : null;
+    var usage = getBandwidthUsage(userId);
+    var totalUsed = usage.upload + usage.download;
+    var remaining = limit - totalUsed;
+    
+    return {
+        allowed: remaining >= bytesNeeded,
+        remaining: remaining,
+        limit: limit,
+        used: totalUsed
+    };
+}
+
+// 格式化字节为可读字符串
+function formatBytes(bytes) {
+    if (bytes === Infinity) return '无限制';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// 显示带宽不足提示，如果是游客则提示登录
+function showBandwidthLimitExceeded() {
+    var userType = defineCurrentUserType();
+    if (userType === 'guest') {
+        showToast('浏览额度已用完，请登录后继续');
+        setTimeout(function() { openAuthModal(); }, 500);
+    } else {
+        showToast('今日带宽额度已用完，请明天再来');
+    }
+}
+
+
+// ======================================
+// 图片压缩（Canvas 方式，节省带宽）
+// ======================================
+function compressImage(file, maxWidth, quality) {
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onload = function() {
+                // 竖屏图片需要特殊处理：限制最大高度，避免内存问题
+                var maxHeight = maxWidth * 2; // 竖屏图片最大高度为宽度的2倍
+                
+                if (img.width <= maxWidth && img.height <= maxHeight && file.size < 500 * 1024) {
+                    // 不需要压缩
+                    resolve(file);
+                    return;
+                }
+                
+                var canvas = document.createElement('canvas');
+                var w = img.width;
+                var h = img.height;
+                
+                // 根据宽高比决定缩放策略
+                if (w > h) {
+                    // 横屏图片：按宽度限制
+                    if (w > maxWidth) {
+                        h = Math.round(h * maxWidth / w);
+                        w = maxWidth;
+                    }
+                } else {
+                    // 竖屏图片：按高度限制
+                    if (h > maxHeight) {
+                        w = Math.round(w * maxHeight / h);
+                        h = maxHeight;
+                    } else if (w > maxWidth) {
+                        // 如果宽度也超过，按宽度缩放
+                        h = Math.round(h * maxWidth / w);
+                        w = maxWidth;
+                    }
+                }
+                
+                canvas.width = w;
+                canvas.height = h;
+                var ctx = canvas.getContext('2d');
+                
+                // 填充白色背景（避免透明 PNG 变成黑色）
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                
+                // 确定输出格式
+                var outputType = file.type || 'image/jpeg';
+                // 如果是 PNG 但文件很大，转为 JPEG 以获得更好压缩
+                if (outputType === 'image/png' && file.size > 2 * 1024 * 1024) {
+                    outputType = 'image/jpeg';
+                }
+                
+                canvas.toBlob(function(blob) {
+                    if (blob && blob.size > 0) {
+                        var compressed = new File([blob], file.name, { type: blob.type || outputType });
+                        resolve(compressed);
+                    } else {
+                        // Canvas toBlob 失败，回退到原文件
+                        console.warn('Canvas toBlob failed for', file.name, '- using original');
+                        resolve(file);
+                    }
+                }, outputType, quality);
+            };
+            img.onerror = function(err) { 
+                console.error('Image load error:', err);
+                resolve(file); 
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = function(err) { 
+            console.error('FileReader error:', err);
+            resolve(file); 
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+
+// ======================================
+// 懒加载（减少不必要的带宽消耗）
+// ======================================
+var lazyObserver = null;
+function setupLazyLoad() {
+    if ('IntersectionObserver' in window) {
+        lazyObserver = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    var img = entry.target;
+                    if (img.dataset.src) {
+                        // 检查带宽限制（预估缩略图约 50KB）
+                        var check = checkBandwidthLimit(50 * 1024);
+                        if (!check.allowed) {
+                            // 带宽不足，显示占位图
+                            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足</text></svg>';
+                            img.style.opacity = '0.5';
+                            lazyObserver.unobserve(img);
                             return;
                         }
-                        var canvas = document.createElement('canvas');
-                        var w = img.width;
-                        var h = img.height;
-                        if (w > maxWidth) {
-                            h = Math.round(h * maxWidth / w);
-                            w = maxWidth;
-                        }
-                        canvas.width = w;
-                        canvas.height = h;
-                        var ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        canvas.toBlob(function(blob) {
-                            if (blob) {
-                                var compressed = new File([blob], file.name, { type: blob.type });
-                                resolve(compressed);
-                            } else {
-                                resolve(file);
-                            }
-                        }, file.type || 'image/jpeg', quality);
-                    };
-                    img.onerror = function() { resolve(file); };
-                    img.src = e.target.result;
-                };
-                reader.onerror = function() { resolve(file); };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // ======================================
-        // 懒加载（减少不必要的带宽消耗）
-        // ======================================
-        var lazyObserver = null;
-        function setupLazyLoad() {
-            if ('IntersectionObserver' in window) {
-                lazyObserver = new IntersectionObserver(function(entries) {
-                    entries.forEach(function(entry) {
-                        if (entry.isIntersecting) {
-                            var img = entry.target;
-                            if (img.dataset.src) {
-                                img.src = img.dataset.src;
-                                delete img.dataset.src;
-                            }
-                            lazyObserver.unobserve(img);
-                        }
-                    });
-                }, { rootMargin: '200px' });
-            }
-        }
-        function lazyLoadImage(imgEl, src) {
-            if (lazyObserver) {
-                imgEl.dataset.src = src;
-                lazyObserver.observe(imgEl);
-            } else {
-                imgEl.src = src;
-            }
-        }
-
-        // ======================================
-        // 用户系统
-        // ======================================
-        var currentUser = null; // { id, nickname }
-        var isWhitelisted = false;
-
-        function loadUserSession() {
-            try {
-                var saved = localStorage.getItem('currentUser');
-                if (saved) {
-                    currentUser = JSON.parse(saved);
-                    updateUserUI();
-                    checkWhitelist();
+                        
+                        // 记录下载带宽
+                        var imageId = img.dataset.imgId;
+                        var userId = currentUser ? currentUser.id : null;
+                        addBandwidthUsage(userId, 0, 50 * 1024);
+                        
+                        img.src = img.dataset.src;
+                        delete img.dataset.src;
+                    }
+                    lazyObserver.unobserve(img);
                 }
-            } catch(e) {}
+            });
+        }, { rootMargin: '200px' });
+    }
+}
+function lazyLoadImage(imgEl, src, imageId) {
+    if (lazyObserver) {
+        imgEl.dataset.src = src;
+        if (imageId) imgEl.dataset.imgId = imageId;
+        lazyObserver.observe(imgEl);
+    } else {
+        // 不支持 IntersectionObserver，直接加载前检查带宽
+        var check = checkBandwidthLimit(50 * 1024);
+        if (!check.allowed) {
+            imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足</text></svg>';
+            imgEl.style.opacity = '0.5';
+            return;
         }
+        var userId = currentUser ? currentUser.id : null;
+        addBandwidthUsage(userId, 0, 50 * 1024);
+        imgEl.src = src;
+    }
+}
 
-        function updateUserUI() {
-            var badge = document.getElementById('user-badge');
-            var authBtn = document.getElementById('auth-btn');
-            if (currentUser) {
-                badge.textContent = currentUser.nickname || currentUser.id;
-                badge.style.display = 'inline-block';
-                authBtn.textContent = '退出';
-                authBtn.classList.add('user-active');
+
+// ======================================
+// 用户系统
+// ======================================
+var currentUser = null; // { id, nickname }
+var isWhitelisted = false;
+
+function loadUserSession() {
+    try {
+        var saved = localStorage.getItem('currentUser');
+        if (saved) {
+            currentUser = JSON.parse(saved);
+            updateUserUI();
+            checkWhitelist();
+        }
+    } catch(e) {}
+}
+
+function updateUserUI() {
+    var badge = document.getElementById('user-badge');
+    var authBtn = document.getElementById('auth-btn');
+    if (currentUser) {
+        badge.textContent = currentUser.nickname || currentUser.id;
+        badge.style.display = 'inline-block';
+        authBtn.textContent = '退出';
+        authBtn.classList.add('user-active');
+    } else {
+        badge.style.display = 'none';
+        authBtn.textContent = '登录';
+        authBtn.classList.remove('user-active');
+    }
+    updateWhitelistTips();
+    // 登录状态变化时更新带宽显示
+    if (typeof updateBandwidthDisplay === 'function') {
+        updateBandwidthDisplay();
+    }
+}
+
+function updateWhitelistTips() {
+    var showTip = currentUser && !isWhitelisted && !isAdmin;
+    document.getElementById('not-wl-tip-home').style.display = showTip ? 'block' : 'none';
+    document.getElementById('not-wl-tip-albums').style.display = showTip ? 'block' : 'none';
+}
+
+function checkWhitelist() {
+    if (!currentUser) { isWhitelisted = false; updateWhitelistTips(); return; }
+    supabaseClient.from('whitelist').select('user_id').eq('user_id', currentUser.id)
+    .then(function(r) {
+        isWhitelisted = !!(r.data && r.data.length > 0);
+        updateWhitelistTips();
+    }).catch(function() { isWhitelisted = false; updateWhitelistTips(); });
+}
+
+function openAuthModal() {
+    // 如果已登录，点击则退出
+    if (currentUser) {
+        if (!confirm('确定要退出登录吗？')) return;
+        currentUser = null;
+        isWhitelisted = false;
+        try { localStorage.removeItem('currentUser'); } catch(e) {}
+        updateUserUI();
+        showToast('已退出登录');
+        return;
+    }
+    document.getElementById('login-id').value = '';
+    document.getElementById('login-pwd').value = '';
+    document.getElementById('reg-id').value = '';
+    document.getElementById('reg-nickname').value = '';
+    document.getElementById('reg-pwd').value = '';
+    switchAuthTab('login');
+    document.getElementById('auth-modal').classList.add('show');
+}
+
+function closeAuthModal() {
+    document.getElementById('auth-modal').classList.remove('show');
+}
+
+function switchAuthTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.auth === tab);
+    });
+    document.getElementById('auth-login-form').classList.toggle('active', tab === 'login');
+    document.getElementById('auth-register-form').classList.toggle('active', tab === 'register');
+}
+
+function doRegister() {
+    var id = document.getElementById('reg-id').value.trim();
+    var nickname = document.getElementById('reg-nickname').value.trim();
+    var pwd = document.getElementById('reg-pwd').value;
+
+    if (!id) { showToast('请输入用户ID'); return; }
+    if (id.length < 2) { showToast('ID至少2个字符'); return; }
+    if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(id)) { showToast('ID只允许字母、数字、下划线、中文'); return; }
+    if (!pwd || pwd.length < 3) { showToast('密码至少3个字符'); return; }
+
+    supabaseClient.from('users').select('id').eq('id', id)
+    .then(function(r) {
+        if (r.data && r.data.length > 0) {
+            showToast('该ID已被注册');
+            return false;
+        }
+        return supabaseClient.from('users').insert([{
+            id: id,
+            nickname: nickname || id,
+            password_hash: simpleHash(pwd)
+        }]);
+    }).then(function(r) {
+        if (r === false) return;
+        if (r && r.error) {
+            if (r.error.message && r.error.message.indexOf('does not exist') !== -1) {
+                showToast('用户表尚未创建，请联系管理员');
+                console.error('users 表不存在');
             } else {
-                badge.style.display = 'none';
-                authBtn.textContent = '登录';
-                authBtn.classList.remove('user-active');
+                throw r.error;
             }
-            updateWhitelistTips();
+            return;
+        }
+        currentUser = { id: id, nickname: nickname || id };
+        try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
+        updateUserUI();
+        closeAuthModal();
+        showToast('注册成功！请等待管理员将你加入白名单');
+        checkWhitelist();
+    }).catch(function(e) {
+        console.error('Register error:', e);
+        showToast('注册失败: ' + (e.message || '未知错误'));
+    });
+}
+
+function doLogin() {
+    var id = document.getElementById('login-id').value.trim();
+    var pwd = document.getElementById('login-pwd').value;
+    if (!id || !pwd) { showToast('请输入ID和密码'); return; }
+
+    // 先检查黑名单
+    supabaseClient.from('blacklist').select('*').eq('user_id', id)
+    .then(function(blResult) {
+        if (blResult.data && blResult.data.length > 0) {
+            showToast('账号已被封禁，无法登录');
+            return false;
+        }
+        return supabaseClient.from('users').select('*').eq('id', id).eq('password_hash', simpleHash(pwd));
+    }).then(function(r) {
+        if (r === false) return; // 黑名单拦截
+        if (r.data && r.data.length > 0) {
+            currentUser = { id: r.data[0].id, nickname: r.data[0].nickname || r.data[0].id };
+            try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
+            updateUserUI();
+            closeAuthModal();
+            showToast('登录成功，欢迎 ' + currentUser.nickname);
+            checkWhitelist();
+        } else {
+            showToast('ID或密码错误');
+        }
+    }).catch(function(e) {
+        console.error('Login error:', e);
+        showToast('登录失败: ' + (e.message || '未知错误'));
+    });
+}
+
+
+// ======================================
+// 管理员系统
+// ======================================
+var isAdmin = safeGet('isAdmin', 'false') === 'true';
+
+function toggleAdminBar() {
+    var bar = document.getElementById('admin-bar');
+    var panel = document.getElementById('admin-panel');
+    var btn = document.getElementById('admin-toggle-btn');
+    if (isAdmin) {
+        isAdmin = false;
+        safeSet('isAdmin', 'false');
+        bar.classList.remove('show');
+        panel.style.display = 'none';
+        btn.classList.remove('active');
+        document.getElementById('admin-pwd').placeholder = '输入管理员密码';
+        document.getElementById('admin-pwd').disabled = false;
+        document.getElementById('admin-pwd').value = '';
+        showToast('已退出管理模式');
+        refreshCurrentView();
+    } else {
+        bar.classList.toggle('show');
+    }
+}
+
+function adminLogin() {
+    var pwd = document.getElementById('admin-pwd').value;
+    if (pwd === ADMIN_PASSWORD) {
+        isAdmin = true;
+        safeSet('isAdmin', 'true');
+        showToast('管理员登录成功');
+        document.getElementById('admin-toggle-btn').classList.add('active');
+        document.getElementById('admin-pwd').placeholder = '已登录管理';
+        document.getElementById('admin-pwd').disabled = true;
+        document.getElementById('admin-bar').classList.remove('show');
+        document.getElementById('admin-panel').style.display = 'flex';
+        loadWhitelist();
+        loadBlacklist();
+        loadBandwidthStats();
+        loadSupabaseQuota();
+        refreshCurrentView();
+    } else {
+        showToast('密码错误');
+    }
+}
+
+
+// ======================================
+// 白名单管理
+// ======================================
+function searchUsers() {
+    var query = document.getElementById('wl-search-input').value.trim();
+    if (!query) { showToast('请输入搜索关键词'); return; }
+
+    var resultsDiv = document.getElementById('wl-search-results');
+    resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">搜索中...</div>';
+    resultsDiv.style.display = 'block';
+
+    // 搜索用户ID或昵称
+    supabaseClient.from('users').select('id, nickname').or('id.ilike.%' + query + '%,nickname.ilike.%' + query + '%').limit(20)
+    .then(function(r) {
+        if (r.error) throw r.error;
+        var users = r.data || [];
+        if (users.length === 0) {
+            resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">未找到用户</div>';
+            return;
         }
 
-        function updateWhitelistTips() {
-            var showTip = currentUser && !isWhitelisted && !isAdmin;
-            document.getElementById('not-wl-tip-home').style.display = showTip ? 'block' : 'none';
-            document.getElementById('not-wl-tip-albums').style.display = showTip ? 'block' : 'none';
-        }
+        // 获取当前白名单
+        return supabaseClient.from('whitelist').select('user_id').then(function(wlR) {
+            var wlIds = {};
+            if (wlR.data) wlR.data.forEach(function(w) { wlIds[w.user_id] = true; });
 
-        function checkWhitelist() {
-            if (!currentUser) { isWhitelisted = false; updateWhitelistTips(); return; }
-            supabaseClient.from('whitelist').select('user_id').eq('user_id', currentUser.id)
-            .then(function(r) {
-                isWhitelisted = !!(r.data && r.data.length > 0);
-                updateWhitelistTips();
-            }).catch(function() { isWhitelisted = false; updateWhitelistTips(); });
-        }
+            var html = '';
+            users.forEach(function(u) {
+                var inWL = wlIds[u.id];
+                html += '<div class="search-result-item">' +
+                    '<div><span class="sr-id">' + escapeHtml(u.id) + '</span>' +
+                    '<span class="sr-name">(' + escapeHtml(u.nickname || u.id) + ')</span></div>' +
+                    (inWL
+                        ? '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(u.id) + '\')">移出白名单</button>'
+                        : '<button class="btn-add-wl" onclick="addToWhitelist(\'' + escapeAttr(u.id) + '\',\'' + escapeAttr(u.nickname || u.id) + '\')">加入白名单</button>'
+                    ) +
+                '</div>';
+            });
+            resultsDiv.innerHTML = html;
+        });
+    }).catch(function(e) {
+        resultsDiv.innerHTML = '<div style="padding:10px;color:red;">搜索失败</div>';
+        console.error('Search error:', e);
+    });
+}
 
-        function openAuthModal() {
-            // 如果已登录，点击则退出
-            if (currentUser) {
-                if (!confirm('确定要退出登录吗？')) return;
-                currentUser = null;
-                isWhitelisted = false;
-                try { localStorage.removeItem('currentUser'); } catch(e) {}
-                updateUserUI();
-                showToast('已退出登录');
+function addToWhitelist(userId, nickname) {
+    supabaseClient.from('whitelist').insert([{ user_id: userId }])
+    .then(function(r) {
+        if (r.error) {
+            if (r.error.code === '23505') { showToast('该用户已在白名单中'); }
+            else throw r.error;
+            return;
+        }
+        showToast('已将 ' + nickname + ' 加入白名单');
+        searchUsers(); // 刷新搜索结果
+        loadWhitelist();
+    }).catch(function(e) {
+        showToast('操作失败: ' + (e.message || ''));
+    });
+}
+
+function removeFromWhitelist(userId) {
+    if (!confirm('确定要将该用户移出白名单吗？')) return;
+    supabaseClient.from('whitelist').delete().eq('user_id', userId)
+    .then(function(r) {
+        if (r.error) throw r.error;
+        showToast('已移出白名单');
+        searchUsers();
+        loadWhitelist();
+    }).catch(function(e) {
+        showToast('操作失败');
+    });
+}
+
+function loadWhitelist() {
+    var listDiv = document.getElementById('wl-current-list');
+    supabaseClient.from('whitelist').select('user_id, added_at').order('added_at', { ascending: true })
+    .then(function(r) {
+        if (r.error) {
+            listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:red;font-size:12px;">加载失败</span>';
+            return;
+        }
+        var items = r.data || [];
+        if (items.length === 0) {
+            listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:#999;font-size:12px;">暂无用户</span>';
+            return;
+        }
+        var html = '<strong>当前白名单（' + items.length + '人）：</strong><br>';
+        items.forEach(function(item) {
+            html += '<div class="wl-item"><span>' + escapeHtml(item.user_id) + '</span>' +
+                '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(item.user_id) + '\')">移除</button></div>';
+        });
+        listDiv.innerHTML = html;
+    });
+}
+
+
+// ======================================
+// 黑名单管理
+// ======================================
+
+function loadBlacklist() {
+    var container = document.getElementById('bl-current-list');
+    container.innerHTML = '<strong>当前黑名单：</strong><br><span style="color:#999;font-size:12px;">加载中...</span>';
+    
+    supabaseClient.from('blacklist').select('*, users!inner(nickname)').order('banned_at', { ascending: false })
+    .then(function(result) {
+        if (result.error) {
+            if (result.error.message && result.error.message.indexOf('does not exist') !== -1) {
+                container.innerHTML = '<strong>当前黑名单：</strong><br><span style="color:#999;font-size:12px;">黑名单表尚未创建</span>';
                 return;
             }
-            document.getElementById('login-id').value = '';
-            document.getElementById('login-pwd').value = '';
-            document.getElementById('reg-id').value = '';
-            document.getElementById('reg-nickname').value = '';
-            document.getElementById('reg-pwd').value = '';
-            switchAuthTab('login');
-            document.getElementById('auth-modal').classList.add('show');
+            throw result.error;
         }
+        renderBlacklist(result.data || [], container);
+    }).catch(function(e) {
+        container.innerHTML = '<strong>当前黑名单：</strong><br><span style="color:#f44336;font-size:12px;">加载失败</span>';
+        console.error('Load blacklist error:', e);
+    });
+}
 
-        function closeAuthModal() {
-            document.getElementById('auth-modal').classList.remove('show');
+function renderBlacklist(list, container) {
+    if (list.length === 0) {
+        container.innerHTML = '<strong>当前黑名单：</strong><br><span style="color:#999;font-size:12px;">暂无被封禁用户</span>';
+        return;
+    }
+    
+    var html = '<strong>当前黑名单（' + list.length + '人）：</strong>';
+    for (var i = 0; i < list.length; i++) {
+        var item = list[i];
+        var nickname = item.users && item.users.nickname ? item.users.nickname : item.user_id;
+        html += '<div class="wl-item">' +
+            '<span>' + escapeHtml(item.user_id) + ' (' + escapeHtml(nickname) + ')</span>' +
+            '<button class="btn-remove-wl" onclick="removeFromBlacklist(\'' + item.user_id + '\')">解除</button>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function searchBlacklistUsers() {
+    var input = document.getElementById('bl-search-input');
+    var keyword = input.value.trim();
+    var resultsDiv = document.getElementById('bl-search-results');
+    
+    if (!keyword) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    resultsDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">搜索中...</div>';
+    resultsDiv.style.display = 'block';
+    
+    // 先检查是否已在黑名单
+    supabaseClient.from('blacklist').select('user_id').eq('user_id', keyword)
+    .then(function(blResult) {
+        var isBlacklisted = blResult.data && blResult.data.length > 0;
+        
+        // 查询用户信息
+        return supabaseClient.from('users').select('*').eq('id', keyword);
+    }).then(function(userResult) {
+        if (!userResult.data || userResult.data.length === 0) {
+            resultsDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">未找到用户</div>';
+            return;
         }
-
-        function switchAuthTab(tab) {
-            document.querySelectorAll('.auth-tab').forEach(function(t) {
-                t.classList.toggle('active', t.dataset.auth === tab);
-            });
-            document.getElementById('auth-login-form').classList.toggle('active', tab === 'login');
-            document.getElementById('auth-register-form').classList.toggle('active', tab === 'register');
-        }
-
-        function doRegister() {
-            var id = document.getElementById('reg-id').value.trim();
-            var nickname = document.getElementById('reg-nickname').value.trim();
-            var pwd = document.getElementById('reg-pwd').value;
-
-            if (!id) { showToast('请输入用户ID'); return; }
-            if (id.length < 2) { showToast('ID至少2个字符'); return; }
-            if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(id)) { showToast('ID只允许字母、数字、下划线、中文'); return; }
-            if (!pwd || pwd.length < 3) { showToast('密码至少3个字符'); return; }
-
-            supabaseClient.from('users').select('id').eq('id', id)
-            .then(function(r) {
-                if (r.data && r.data.length > 0) {
-                    showToast('该ID已被注册');
-                    return false;
-                }
-                return supabaseClient.from('users').insert([{
-                    id: id,
-                    nickname: nickname || id,
-                    password_hash: simpleHash(pwd)
-                }]);
-            }).then(function(r) {
-                if (r === false) return;
-                if (r && r.error) {
-                    if (r.error.message && r.error.message.indexOf('does not exist') !== -1) {
-                        showToast('用户表尚未创建，请联系管理员');
-                        console.error('users 表不存在');
-                    } else {
-                        throw r.error;
-                    }
-                    return;
-                }
-                currentUser = { id: id, nickname: nickname || id };
-                try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
-                updateUserUI();
-                closeAuthModal();
-                showToast('注册成功！请等待管理员将你加入白名单');
-                checkWhitelist();
-            }).catch(function(e) {
-                console.error('Register error:', e);
-                showToast('注册失败: ' + (e.message || '未知错误'));
-            });
-        }
-
-        function doLogin() {
-            var id = document.getElementById('login-id').value.trim();
-            var pwd = document.getElementById('login-pwd').value;
-            if (!id || !pwd) { showToast('请输入ID和密码'); return; }
-
-            supabaseClient.from('users').select('*').eq('id', id).eq('password_hash', simpleHash(pwd))
-            .then(function(r) {
-                if (r.data && r.data.length > 0) {
-                    currentUser = { id: r.data[0].id, nickname: r.data[0].nickname || r.data[0].id };
-                    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch(e) {}
-                    updateUserUI();
-                    closeAuthModal();
-                    showToast('登录成功，欢迎 ' + currentUser.nickname);
-                    checkWhitelist();
-                } else {
-                    showToast('ID或密码错误');
-                }
-            }).catch(function(e) {
-                console.error('Login error:', e);
-                showToast('登录失败: ' + (e.message || '未知错误'));
-            });
-        }
-
-        // 简单哈希（前端场景够用，非密码学安全）
-        function simpleHash(str) {
-            var hash = 0;
-            for (var i = 0; i < str.length; i++) {
-                var c = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + c;
-                hash = hash & hash;
-            }
-            return 'h_' + Math.abs(hash).toString(36);
-        }
-
-        // ======================================
-        // 管理员系统
-        // ======================================
-        var isAdmin = safeGet('isAdmin', 'false') === 'true';
-
-        function toggleAdminBar() {
-            var bar = document.getElementById('admin-bar');
-            var panel = document.getElementById('admin-panel');
-            var btn = document.getElementById('admin-toggle-btn');
-            if (isAdmin) {
-                isAdmin = false;
-                safeSet('isAdmin', 'false');
-                bar.classList.remove('show');
-                panel.style.display = 'none';
-                btn.classList.remove('active');
-                document.getElementById('admin-pwd').placeholder = '输入管理员密码';
-                document.getElementById('admin-pwd').disabled = false;
-                document.getElementById('admin-pwd').value = '';
-                showToast('已退出管理模式');
-                refreshCurrentView();
+        
+        var user = userResult.data[0];
+        // 再次检查黑名单状态
+        return supabaseClient.from('blacklist').select('*').eq('user_id', user.id)
+        .then(function(blCheck) {
+            var isBlacklisted = blCheck.data && blCheck.data.length > 0;
+            
+            var html = '<div class="search-result-item">' +
+                '<div><span class="sr-id">' + escapeHtml(user.id) + '</span>' +
+                '<span class="sr-name">' + escapeHtml(user.nickname || user.id) + '</span></div>';
+            
+            if (isBlacklisted) {
+                html += '<button class="btn-remove-wl" onclick="removeFromBlacklist(\'' + user.id + '\')">解除封禁</button>';
             } else {
-                bar.classList.toggle('show');
+                html += '<button class="btn-add-wl" onclick="addToBlacklist(\'' + user.id + '\')">加入黑名单</button>';
             }
-        }
-
-        function adminLogin() {
-            var pwd = document.getElementById('admin-pwd').value;
-            if (pwd === ADMIN_PASSWORD) {
-                isAdmin = true;
-                safeSet('isAdmin', 'true');
-                showToast('管理员登录成功');
-                document.getElementById('admin-toggle-btn').classList.add('active');
-                document.getElementById('admin-pwd').placeholder = '已登录管理';
-                document.getElementById('admin-pwd').disabled = true;
-                document.getElementById('admin-bar').classList.remove('show');
-                document.getElementById('admin-panel').style.display = 'flex';
-                loadWhitelist();
-                refreshCurrentView();
-            } else {
-                showToast('密码错误');
-            }
-        }
-
-        // ======================================
-        // 白名单管理
-        // ======================================
-        function searchUsers() {
-            var query = document.getElementById('wl-search-input').value.trim();
-            if (!query) { showToast('请输入搜索关键词'); return; }
-
-            var resultsDiv = document.getElementById('wl-search-results');
-            resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">搜索中...</div>';
-            resultsDiv.style.display = 'block';
-
-            // 搜索用户ID或昵称
-            supabaseClient.from('users').select('id, nickname').or('id.ilike.%' + query + '%,nickname.ilike.%' + query + '%').limit(20)
-            .then(function(r) {
-                if (r.error) throw r.error;
-                var users = r.data || [];
-                if (users.length === 0) {
-                    resultsDiv.innerHTML = '<div style="padding:10px;color:#999;">未找到用户</div>';
-                    return;
-                }
-
-                // 获取当前白名单
-                return supabaseClient.from('whitelist').select('user_id').then(function(wlR) {
-                    var wlIds = {};
-                    if (wlR.data) wlR.data.forEach(function(w) { wlIds[w.user_id] = true; });
-
-                    var html = '';
-                    users.forEach(function(u) {
-                        var inWL = wlIds[u.id];
-                        html += '<div class="search-result-item">' +
-                            '<div><span class="sr-id">' + escapeHtml(u.id) + '</span>' +
-                            '<span class="sr-name">(' + escapeHtml(u.nickname || u.id) + ')</span></div>' +
-                            (inWL
-                                ? '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(u.id) + '\')">移出白名单</button>'
-                                : '<button class="btn-add-wl" onclick="addToWhitelist(\'' + escapeAttr(u.id) + '\',\'' + escapeAttr(u.nickname || u.id) + '\')">加入白名单</button>'
-                            ) +
-                        '</div>';
-                    });
-                    resultsDiv.innerHTML = html;
-                });
-            }).catch(function(e) {
-                resultsDiv.innerHTML = '<div style="padding:10px;color:red;">搜索失败</div>';
-                console.error('Search error:', e);
-            });
-        }
-
-        function addToWhitelist(userId, nickname) {
-            supabaseClient.from('whitelist').insert([{ user_id: userId }])
-            .then(function(r) {
-                if (r.error) {
-                    if (r.error.code === '23505') { showToast('该用户已在白名单中'); }
-                    else throw r.error;
-                    return;
-                }
-                showToast('已将 ' + nickname + ' 加入白名单');
-                searchUsers(); // 刷新搜索结果
-                loadWhitelist();
-            }).catch(function(e) {
-                showToast('操作失败: ' + (e.message || ''));
-            });
-        }
-
-        function removeFromWhitelist(userId) {
-            if (!confirm('确定要将该用户移出白名单吗？')) return;
-            supabaseClient.from('whitelist').delete().eq('user_id', userId)
-            .then(function(r) {
-                if (r.error) throw r.error;
-                showToast('已移出白名单');
-                searchUsers();
-                loadWhitelist();
-            }).catch(function(e) {
-                showToast('操作失败');
-            });
-        }
-
-        function loadWhitelist() {
-            var listDiv = document.getElementById('wl-current-list');
-            supabaseClient.from('whitelist').select('user_id, added_at').order('added_at', { ascending: true })
-            .then(function(r) {
-                if (r.error) {
-                    listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:red;font-size:12px;">加载失败</span>';
-                    return;
-                }
-                var items = r.data || [];
-                if (items.length === 0) {
-                    listDiv.innerHTML = '<strong>当前白名单：</strong><br><span style="color:#999;font-size:12px;">暂无用户</span>';
-                    return;
-                }
-                var html = '<strong>当前白名单（' + items.length + '人）：</strong><br>';
-                items.forEach(function(item) {
-                    html += '<div class="wl-item"><span>' + escapeHtml(item.user_id) + '</span>' +
-                        '<button class="btn-remove-wl" onclick="removeFromWhitelist(\'' + escapeAttr(item.user_id) + '\')">移除</button></div>';
-                });
-                listDiv.innerHTML = html;
-            });
-        }
-
-        // ======================================
-        // 状态
-        // ======================================
-        var currentTab = 'home';
-        var currentAlbumId = null;
-        var pendingFiles = [];
-        var pendingAlbumCover = null;
-        var likedIds = JSON.parse(safeGet('likedIds', '[]'));
-
-        // 初始化 Supabase
-        var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // ======================================
-        // 页面初始化
-        // ======================================
-        document.addEventListener('DOMContentLoaded', function() {
-            setupLazyLoad();
-            loadUserSession();
-
-            // Tab 切换
-            document.querySelectorAll('.tab').forEach(function(tab) {
-                tab.addEventListener('click', function() {
-                    var tabName = this.dataset.tab;
-                    if (tabName === 'albums' && currentTab === 'albums' && currentAlbumId) {
-                        backToAlbumList();
-                        return;
-                    }
-                    switchTab(tabName);
-                });
-            });
-
-            // 文件选择
-            document.getElementById('file-input-image').addEventListener('change', function(e) {
-                handleFileSelect(e.target.files, 'image');
-            });
-            document.getElementById('file-input-album-cover').addEventListener('change', function(e) {
-                handleFileSelect(e.target.files, 'cover');
-            });
-
-            // 拖拽上传
-            setupDragDrop('upload-drop', 'image');
-            setupDragDrop('album-cover-drop', 'cover');
-
-            // 弹窗关闭
-            document.getElementById('image-modal').addEventListener('click', function(e) {
-                if (e.target === this || e.target.classList.contains('close')) closeModal();
-            });
-            document.getElementById('upload-modal').addEventListener('click', function(e) {
-                if (e.target === this) closeUploadModal();
-            });
-            document.getElementById('album-create-modal').addEventListener('click', function(e) {
-                if (e.target === this) closeAlbumCreateModal();
-            });
-            document.getElementById('auth-modal').addEventListener('click', function(e) {
-                if (e.target === this) closeAuthModal();
-            });
-
-            // 管理员状态恢复
-            if (isAdmin) {
-                document.getElementById('admin-toggle-btn').classList.add('active');
-                document.getElementById('admin-pwd').placeholder = '已登录管理';
-                document.getElementById('admin-pwd').disabled = true;
-                document.getElementById('admin-panel').style.display = 'flex';
-                loadWhitelist();
-            }
-
-            loadImages();
+            html += '</div>';
+            
+            resultsDiv.innerHTML = html;
         });
+    }).catch(function(e) {
+        resultsDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#f44336;">搜索失败</div>';
+        console.error('Search blacklist error:', e);
+    });
+}
 
-        function setupDragDrop(dropId, type) {
-            var dz = document.getElementById(dropId);
-            dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
-            dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
-            dz.addEventListener('drop', function(e) {
-                e.preventDefault(); dz.classList.remove('dragover');
-                handleFileSelect(e.dataTransfer.files, type);
+function addToBlacklist(userId) {
+    if (!confirm('确定要将用户 ' + userId + ' 加入黑名单吗？')) return;
+    
+    supabaseClient.from('blacklist').insert([{
+        user_id: userId,
+        banned_by: isAdmin ? 'admin' : (currentUser ? currentUser.id : null)
+    }]).then(function(result) {
+        if (result.error) {
+            if (result.error.message && result.error.message.indexOf('does not exist') !== -1) {
+                showToast('请先创建 blacklist 表');
+                return;
+            }
+            throw result.error;
+        }
+        showToast('已加入黑名单');
+        loadBlacklist();
+        document.getElementById('bl-search-results').style.display = 'none';
+        document.getElementById('bl-search-input').value = '';
+    }).catch(function(e) {
+        showToast('操作失败: ' + e.message);
+        console.error('Add to blacklist error:', e);
+    });
+}
+
+function removeFromBlacklist(userId) {
+    if (!confirm('确定要解除 ' + userId + ' 的封禁吗？')) return;
+    
+    supabaseClient.from('blacklist').delete().eq('user_id', userId)
+    .then(function(result) {
+        if (result.error) throw result.error;
+        showToast('已解除封禁');
+        loadBlacklist();
+        document.getElementById('bl-search-results').style.display = 'none';
+    }).catch(function(e) {
+        showToast('操作失败: ' + e.message);
+        console.error('Remove from blacklist error:', e);
+    });
+}
+
+
+// ======================================
+// 带宽管理（管理员面板）
+// ======================================
+
+// 加载所有用户的带宽使用统计
+function loadBandwidthStats() {
+    if (!isAdmin) return;
+    
+    var container = document.getElementById('bandwidth-stats-list');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="color:#999;font-size:12px;">加载中...</div>';
+    
+    // 从 Supabase 获取今日所有用户的带宽记录
+    var today = getTodayKey();
+    supabaseClient.from('bandwidth_usage').select('*').eq('date', today)
+    .then(function(result) {
+        if (result.error) throw result.error;
+        renderBandwidthStats(result.data || []);
+    }).catch(function(e) {
+        container.innerHTML = '<div style="color:#f44336;font-size:12px;">加载失败: ' + e.message + '</div>';
+    });
+}
+
+// 渲染带宽统计列表
+function renderBandwidthStats(records) {
+    var container = document.getElementById('bandwidth-stats-list');
+    if (!container) return;
+    
+    if (records.length === 0) {
+        container.innerHTML = '<div style="color:#999;font-size:12px;">今日暂无带宽使用记录</div>';
+        return;
+    }
+    
+    // 按下载量排序
+    records.sort(function(a, b) {
+        var totalA = (a.download_bytes || 0) + (a.upload_bytes || 0);
+        var totalB = (b.download_bytes || 0) + (b.upload_bytes || 0);
+        return totalB - totalA;
+    });
+    
+    var html = '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+    html += '<tr style="background:#f5f5f5;">';
+    html += '<th style="padding:8px;text-align:left;">用户ID</th>';
+    html += '<th style="padding:8px;text-align:right;">下载</th>';
+    html += '<th style="padding:8px;text-align:right;">上传</th>';
+    html += '<th style="padding:8px;text-align:right;">总计</th>';
+    html += '</tr>';
+    
+    var totalDownload = 0, totalUpload = 0;
+    
+    records.forEach(function(r) {
+        var down = r.download_bytes || 0;
+        var up = r.upload_bytes || 0;
+        totalDownload += down;
+        totalUpload += up;
+        
+        html += '<tr style="border-bottom:1px solid #eee;">';
+        html += '<td style="padding:8px;">' + escapeHtml(r.user_id) + '</td>';
+        html += '<td style="padding:8px;text-align:right;">' + formatBytes(down) + '</td>';
+        html += '<td style="padding:8px;text-align:right;">' + formatBytes(up) + '</td>';
+        html += '<td style="padding:8px;text-align:right;font-weight:bold;">' + formatBytes(down + up) + '</td>';
+        html += '</tr>';
+    });
+    
+    html += '<tr style="background:#e3f2fd;font-weight:bold;">';
+    html += '<td style="padding:8px;">合计</td>';
+    html += '<td style="padding:8px;text-align:right;">' + formatBytes(totalDownload) + '</td>';
+    html += '<td style="padding:8px;text-align:right;">' + formatBytes(totalUpload) + '</td>';
+    html += '<td style="padding:8px;text-align:right;">' + formatBytes(totalDownload + totalUpload) + '</td>';
+    html += '</tr>';
+    
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+// ======================================
+// Supabase 额度监控
+// ======================================
+function loadSupabaseQuota() {
+    if (!isAdmin) return;
+    
+    // 获取项目引用信息用于查询配额
+    var projectRef = SUPABASE_URL.split('//')[1].split('.')[0];
+    
+    // 显示加载状态
+    document.getElementById('db-size-bar').style.width = '0%';
+    document.getElementById('db-size-text').textContent = '加载中...';
+    document.getElementById('storage-size-bar').style.width = '0%';
+    document.getElementById('storage-size-text').textContent = '加载中...';
+    
+    // 查询数据库大小（通过 pg_size_pretty）
+    supabaseClient.rpc('get_db_size')
+    .then(function(result) {
+        if (result.error) {
+            // 如果没有自定义函数，尝试直接查询
+            return supabaseClient.from('images').select('id', { count: 'exact', head: true });
+        }
+        return { data: result.data, isSize: true };
+    }).then(function(r) {
+        if (r && r.isSize) {
+            // 有自定义函数返回数据库大小
+            updateDbSizeDisplay(r.data);
+        } else if (r && r.count !== undefined) {
+            // 只有记录数，估算大小
+            var estimatedBytes = r.count * 5000; // 假设每条记录平均5KB
+            updateDbSizeDisplay(estimatedBytes);
+        }
+    }).catch(function() {
+        document.getElementById('db-size-text').textContent = '无法获取';
+    });
+    
+    // 查询存储桶大小
+    supabaseClient.storage.from(STORAGE_BUCKET).list()
+    .then(function(result) {
+        if (result.error) throw result.error;
+        var totalSize = 0;
+        if (result.data) {
+            result.data.forEach(function(file) {
+                totalSize += file.metadata?.size || 0;
             });
         }
+        updateStorageSizeDisplay(totalSize);
+    }).catch(function() {
+        document.getElementById('storage-size-text').textContent = '无法获取';
+    });
+}
 
-        // ======================================
-        // Tab 切换
-        // ======================================
-        function switchTab(tabName) {
-            currentTab = tabName;
-            currentAlbumId = null;
-            document.querySelectorAll('.tab').forEach(function(t) {
-                t.classList.toggle('active', t.dataset.tab === tabName);
+function updateDbSizeDisplay(bytes) {
+    var limit = 500 * 1024 * 1024; // Supabase 免费版 500MB 数据库限制
+    var percent = Math.min((bytes / limit * 100), 100).toFixed(1);
+    
+    document.getElementById('db-size-bar').style.width = percent + '%';
+    document.getElementById('db-size-text').textContent = formatBytes(bytes) + ' / ' + formatBytes(limit) + ' (' + percent + '%)';
+    
+    // 根据使用率变色
+    var bar = document.getElementById('db-size-bar');
+    if (percent >= 90) bar.style.background = '#f44336';
+    else if (percent >= 70) bar.style.background = '#ff9800';
+    else bar.style.background = '#4CAF50';
+}
+
+function updateStorageSizeDisplay(bytes) {
+    var limit = 1024 * 1024 * 1024; // Supabase 免费版 1GB 存储限制
+    var percent = Math.min((bytes / limit * 100), 100).toFixed(1);
+    
+    document.getElementById('storage-size-bar').style.width = percent + '%';
+    document.getElementById('storage-size-text').textContent = formatBytes(bytes) + ' / ' + formatBytes(limit) + ' (' + percent + '%)';
+    
+    // 根据使用率变色
+    var bar = document.getElementById('storage-size-bar');
+    if (percent >= 90) bar.style.background = '#f44336';
+    else if (percent >= 70) bar.style.background = '#ff9800';
+    else bar.style.background = '#4CAF50';
+}
+
+
+// ======================================
+// 上传图片
+// ======================================
+var pendingFiles = [];
+var pendingAlbumCover = null;
+
+function checkUploadPermission() {
+    if (isAdmin) return true;
+    if (!currentUser) {
+        showToast('请先登录');
+        openAuthModal();
+        return false;
+    }
+    if (!isWhitelisted) {
+        showToast('你不在白名单中，无法上传');
+        return false;
+    }
+    return true;
+}
+
+function openUploadModal() {
+    if (!checkUploadPermission()) return;
+    pendingFiles = [];
+    document.getElementById('upload-file-list').innerHTML = '';
+    document.getElementById('upload-album-select').innerHTML = '<option value="">不放入相册</option>';
+    document.getElementById('upload-confirm-btn').disabled = true;
+    document.getElementById('upload-progress').classList.remove('show');
+    document.getElementById('upload-modal').classList.add('show');
+    document.getElementById('file-input-image').value = '';
+    loadAlbumOptions();
+}
+
+function loadAlbumOptions() {
+    supabaseClient.from('albums').select('id, name').order('created_at', { ascending: false })
+    .then(function(result) {
+        if (result.data && result.data.length > 0) {
+            var sel = document.getElementById('upload-album-select');
+            sel.innerHTML = '<option value="">不放入相册</option>';
+            result.data.forEach(function(a) {
+                sel.innerHTML += '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>';
             });
-            document.getElementById('home-panel').style.display = tabName === 'home' ? 'block' : 'none';
-            document.getElementById('albums-panel').style.display = tabName === 'albums' ? 'block' : 'none';
-            document.getElementById('ranking-panel').style.display = tabName === 'ranking' ? 'block' : 'none';
-            if (tabName === 'home') loadImages();
-            else if (tabName === 'albums') loadAlbums();
-            else if (tabName === 'ranking') loadRanking();
         }
+    }).catch(function() {});
+}
 
-        function refreshCurrentView() {
-            if (currentTab === 'home') loadImages();
-            else if (currentTab === 'albums') {
-                if (currentAlbumId) loadAlbumDetail(currentAlbumId);
-                else loadAlbums();
-            }
-            else if (currentTab === 'ranking') loadRanking();
-        }
+function closeUploadModal() {
+    document.getElementById('upload-modal').classList.remove('show');
+    document.getElementById('file-input-image').value = '';
+    pendingFiles = [];
+}
 
-        // ======================================
-        // 上传前检查权限
-        // ======================================
-        function checkUploadPermission() {
-            if (isAdmin) return true;
-            if (!currentUser) {
-                showToast('请先登录');
-                openAuthModal();
-                return false;
+function handleFileSelect(files, type) {
+    var filtered = [];
+    for (var i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image/') === 0) filtered.push(files[i]);
+    }
+    if (type === 'image') {
+        pendingFiles = filtered;
+        var listEl = document.getElementById('upload-file-list');
+        if (pendingFiles.length > 0) {
+            var html = '';
+            for (var j = 0; j < pendingFiles.length; j++) {
+                html += '<div>' + escapeHtml(pendingFiles[j].name) + ' (' + (pendingFiles[j].size / 1024).toFixed(1) + ' KB)</div>';
             }
-            if (!isWhitelisted) {
-                showToast('你不在白名单中，无法上传');
-                return false;
-            }
-            return true;
-        }
-
-        // ======================================
-        // 上传图片
-        // ======================================
-        function openUploadModal() {
-            if (!checkUploadPermission()) return;
-            pendingFiles = [];
-            document.getElementById('upload-file-list').innerHTML = '';
-            document.getElementById('upload-album-select').innerHTML = '<option value="">不放入相册</option>';
+            listEl.innerHTML = html;
+            document.getElementById('upload-confirm-btn').disabled = false;
+        } else {
+            listEl.innerHTML = '';
             document.getElementById('upload-confirm-btn').disabled = true;
-            document.getElementById('upload-progress').classList.remove('show');
-            document.getElementById('upload-modal').classList.add('show');
-            document.getElementById('file-input-image').value = '';
-            loadAlbumOptions();
+        }
+    } else if (type === 'cover') {
+        if (filtered.length > 0) {
+            pendingAlbumCover = filtered[0];
+            document.getElementById('album-cover-file-list').innerHTML = '<div>' + escapeHtml(pendingAlbumCover.name) + '</div>';
+            document.getElementById('album-confirm-btn').disabled = false;
+        }
+    }
+}
+
+function confirmUpload() {
+    if (pendingFiles.length === 0) return;
+
+    var albumId = document.getElementById('upload-album-select').value;
+    var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+    var uploaderId = currentUser ? currentUser.id : null;
+
+    // 计算总上传大小并检查带宽
+    var totalUploadBytes = 0;
+    for (var i = 0; i < pendingFiles.length; i++) {
+        totalUploadBytes += pendingFiles[i].size;
+    }
+    var check = checkBandwidthLimit(totalUploadBytes);
+    if (!check.allowed) {
+        showToast('上传失败：今日上传额度不足，剩余 ' + formatBytes(check.remaining));
+        return;
+    }
+
+    var btn = document.getElementById('upload-confirm-btn');
+    btn.disabled = true;
+    var progressEl = document.getElementById('upload-progress');
+    var progressBar = document.getElementById('upload-progress-bar');
+    progressEl.classList.add('show');
+
+    var success = 0;
+    var fail = 0;
+    var idx = 0;
+    var totalUploadedBytes = 0;
+
+    function uploadNext() {
+        if (idx >= pendingFiles.length) {
+            progressEl.classList.remove('show');
+            closeUploadModal();
+            if (fail === 0) showToast('成功上传 ' + success + ' 张图片');
+            else showToast('上传完成：' + success + ' 成功，' + fail + ' 失败');
+            refreshCurrentView();
+            return;
         }
 
-        function loadAlbumOptions() {
-            supabaseClient.from('albums').select('id, name').order('created_at', { ascending: false })
-            .then(function(result) {
-                if (result.data && result.data.length > 0) {
-                    var sel = document.getElementById('upload-album-select');
-                    sel.innerHTML = '<option value="">不放入相册</option>';
-                    result.data.forEach(function(a) {
-                        sel.innerHTML += '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>';
-                    });
-                }
-            }).catch(function() {});
-        }
-
-        function closeUploadModal() {
-            document.getElementById('upload-modal').classList.remove('show');
-            document.getElementById('file-input-image').value = '';
-            pendingFiles = [];
-        }
-
-        function handleFileSelect(files, type) {
-            var filtered = [];
-            for (var i = 0; i < files.length; i++) {
-                if (files[i].type && files[i].type.indexOf('image/') === 0) filtered.push(files[i]);
+        var file = pendingFiles[idx];
+        // 先压缩
+        compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+            var sizeDiff = file.size - compressed.size;
+            if (sizeDiff > 0) {
+                console.log('压缩 ' + file.name + ': ' + (file.size/1024).toFixed(1) + 'KB -> ' + (compressed.size/1024).toFixed(1) + 'KB (节省' + (sizeDiff/file.size*100).toFixed(0) + '%)');
             }
-            if (type === 'image') {
-                pendingFiles = filtered;
-                var listEl = document.getElementById('upload-file-list');
-                if (pendingFiles.length > 0) {
-                    var html = '';
-                    for (var j = 0; j < pendingFiles.length; j++) {
-                        html += '<div>' + escapeHtml(pendingFiles[j].name) + ' (' + (pendingFiles[j].size / 1024).toFixed(1) + ' KB)</div>';
-                    }
-                    listEl.innerHTML = html;
-                    document.getElementById('upload-confirm-btn').disabled = false;
-                } else {
-                    listEl.innerHTML = '';
-                    document.getElementById('upload-confirm-btn').disabled = true;
-                }
-            } else if (type === 'cover') {
-                if (filtered.length > 0) {
-                    pendingAlbumCover = filtered[0];
-                    document.getElementById('album-cover-file-list').innerHTML = '<div>' + escapeHtml(pendingAlbumCover.name) + '</div>';
-                    document.getElementById('album-confirm-btn').disabled = false;
-                }
-            }
-        }
+            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
 
-        function confirmUpload() {
-            if (pendingFiles.length === 0) return;
-
-            var albumId = document.getElementById('upload-album-select').value;
-            var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
-            var uploaderId = currentUser ? currentUser.id : null;
-
-            var btn = document.getElementById('upload-confirm-btn');
-            btn.disabled = true;
-            var progressEl = document.getElementById('upload-progress');
-            var progressBar = document.getElementById('upload-progress-bar');
-            progressEl.classList.add('show');
-
-            var success = 0;
-            var fail = 0;
-            var idx = 0;
-
-            function uploadNext() {
-                if (idx >= pendingFiles.length) {
-                    progressEl.classList.remove('show');
-                    closeUploadModal();
-                    if (fail === 0) showToast('成功上传 ' + success + ' 张图片');
-                    else showToast('上传完成：' + success + ' 成功，' + fail + ' 失败');
-                    refreshCurrentView();
-                    return;
-                }
-
-                var file = pendingFiles[idx];
-                // 先压缩
-                compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
-                    var sizeDiff = file.size - compressed.size;
-                    if (sizeDiff > 0) {
-                        console.log('压缩 ' + file.name + ': ' + (file.size/1024).toFixed(1) + 'KB -> ' + (compressed.size/1024).toFixed(1) + 'KB (节省' + (sizeDiff/file.size*100).toFixed(0) + '%)');
-                    }
-                    var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
-
-                    return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
-                        if (uploadResult.error) throw uploadResult.error;
-                        var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
-                        var record = {
-                            url: publicUrl,
-                            uploader_id: uploaderId,
-                            uploader_name: uploaderName,
-                            like_count: 0
-                        };
-                        if (albumId) record.album_id = albumId;
-                        return supabaseClient.from('images').insert([record]);
-                    }).then(function(insertResult) {
-                        if (insertResult && insertResult.error) throw insertResult.error;
-                        success++;
-                    });
-                }).catch(function(err) {
-                    console.error('Upload fail:', err);
-                    fail++;
-                }).finally(function() {
-                    idx++;
-                    progressBar.style.width = (idx / pendingFiles.length * 100) + '%';
-                    uploadNext();
-                });
-            }
-
-            uploadNext();
-        }
-
-        // ======================================
-        // 创建相册
-        // ======================================
-        function openAlbumCreateModal() {
-            if (!checkUploadPermission()) return;
-            pendingAlbumCover = null;
-            document.getElementById('album-cover-file-list').innerHTML = '';
-            document.getElementById('album-name-input').value = '';
-            document.getElementById('album-confirm-btn').disabled = true;
-            document.getElementById('album-progress').classList.remove('show');
-            document.getElementById('album-create-modal').classList.add('show');
-            document.getElementById('file-input-album-cover').value = '';
-        }
-
-        function closeAlbumCreateModal() {
-            document.getElementById('album-create-modal').classList.remove('show');
-            document.getElementById('file-input-album-cover').value = '';
-            pendingAlbumCover = null;
-        }
-
-        function confirmCreateAlbum() {
-            var albumName = document.getElementById('album-name-input').value.trim();
-            if (!albumName) { showToast('请输入相册名称'); return; }
-
-            var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
-            var uploaderId = currentUser ? currentUser.id : null;
-
-            var btn = document.getElementById('album-confirm-btn');
-            btn.disabled = true;
-            var coverUrl = null;
-
-            function doCreate() {
+            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
+                if (uploadResult.error) throw uploadResult.error;
+                var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
                 var record = {
-                    name: albumName,
-                    cover_url: coverUrl,
+                    url: publicUrl,
                     uploader_id: uploaderId,
-                    uploader_name: uploaderName
+                    uploader_name: uploaderName,
+                    like_count: 0
                 };
-
-                supabaseClient.from('albums').insert([record]).then(function(result) {
-                    if (result.error) {
-                        if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
-                            showToast('请先在 Supabase 创建 albums 表');
-                        } else {
-                            throw result.error;
-                        }
-                    } else {
-                        closeAlbumCreateModal();
-                        showToast('相册「' + albumName + '」创建成功');
-                        if (currentTab === 'albums') loadAlbums();
-                    }
-                }).catch(function(err) {
-                    console.error('Create album fail:', err);
-                    showToast('创建失败: ' + (err.message || '未知错误'));
-                }).finally(function() {
-                    btn.disabled = false;
-                    document.getElementById('album-progress').classList.remove('show');
-                });
-            }
-
-            if (pendingAlbumCover) {
-                var progressEl = document.getElementById('album-progress');
-                var progressBar = document.getElementById('album-progress-bar');
-                progressEl.classList.add('show');
-                progressBar.style.width = '30%';
-
-                compressImage(pendingAlbumCover, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
-                    var fileName = 'album_cover_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + pendingAlbumCover.name;
-                    return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed);
-                }).then(function(uploadResult) {
-                    if (uploadResult.error) throw uploadResult.error;
-                    progressBar.style.width = '70%';
-                    var fileName = uploadResult.data.path;
-                    coverUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
-                }).catch(function(err) {
-                    console.warn('Cover upload failed:', err);
-                }).finally(function() {
-                    doCreate();
-                });
-            } else {
-                doCreate();
-            }
-        }
-
-        // ======================================
-        // 加载数据
-        // ======================================
-        function loadImages() {
-            var container = document.getElementById('home-images');
-            container.innerHTML = '<div class="loading">加载中...</div>';
-            supabaseClient.from('images').select('*').order('created_at', { ascending: false })
-            .then(function(result) {
-                if (result.error) throw result.error;
-                renderImages(result.data || [], container);
-            }).catch(function(e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+                if (albumId) record.album_id = albumId;
+                return supabaseClient.from('images').insert([record]);
+            }).then(function(insertResult) {
+                if (insertResult && insertResult.error) throw insertResult.error;
+                success++;
+                totalUploadedBytes += compressed.size;
             });
-        }
+        }).catch(function(err) {
+            console.error('Upload fail:', err);
+            fail++;
+        }).finally(function() {
+            idx++;
+            progressBar.style.width = (idx / pendingFiles.length * 100) + '%';
+            uploadNext();
+        });
+    }
 
-        function loadRanking() {
-            var container = document.getElementById('ranking-images');
-            container.innerHTML = '<div class="loading">加载中...</div>';
-            supabaseClient.from('images').select('*').order('like_count', { ascending: false })
-            .then(function(result) {
-                if (result.error) throw result.error;
-                renderImages(result.data || [], container);
-            }).catch(function(e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
-            });
-        }
+    uploadNext();
+}
 
-        function loadAlbums() {
-            var container = document.getElementById('albums-grid');
-            container.innerHTML = '<div class="loading">加载中...</div>';
-            document.getElementById('album-list-view').style.display = 'block';
-            document.getElementById('album-detail-view').style.display = 'none';
 
-            supabaseClient.from('albums').select('*').order('created_at', { ascending: false })
-            .then(function(result) {
-                if (result.error) {
-                    if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
-                        container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">相册功能尚未启用<br>请先在 Supabase 创建 albums 表</div></div>';
-                        return;
-                    }
+// ======================================
+// 创建相册
+// ======================================
+function openAlbumCreateModal() {
+    if (!checkUploadPermission()) return;
+    pendingAlbumCover = null;
+    document.getElementById('album-cover-file-list').innerHTML = '';
+    document.getElementById('album-name-input').value = '';
+    document.getElementById('album-confirm-btn').disabled = true;
+    document.getElementById('album-progress').classList.remove('show');
+    document.getElementById('album-create-modal').classList.add('show');
+    document.getElementById('file-input-album-cover').value = '';
+}
+
+function closeAlbumCreateModal() {
+    document.getElementById('album-create-modal').classList.remove('show');
+    document.getElementById('file-input-album-cover').value = '';
+    pendingAlbumCover = null;
+}
+
+function confirmCreateAlbum() {
+    var albumName = document.getElementById('album-name-input').value.trim();
+    if (!albumName) { showToast('请输入相册名称'); return; }
+
+    var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+    var uploaderId = currentUser ? currentUser.id : null;
+
+    var btn = document.getElementById('album-confirm-btn');
+    btn.disabled = true;
+    var coverUrl = null;
+
+    function doCreate() {
+        var record = {
+            name: albumName,
+            cover_url: coverUrl,
+            uploader_id: uploaderId,
+            uploader_name: uploaderName
+        };
+
+        supabaseClient.from('albums').insert([record]).then(function(result) {
+            if (result.error) {
+                if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                    showToast('请先在 Supabase 创建 albums 表');
+                } else {
                     throw result.error;
                 }
-                var albums = result.data || [];
-                if (albums.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">还没有相册，点击右侧按钮创建吧</div></div>';
-                    return;
-                }
-                var promises = albums.map(function(album) {
-                    return supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', album.id)
-                    .then(function(r) { album.image_count = r.count || 0; return album; });
-                });
-                return Promise.all(promises);
-            }).then(function(albums) {
-                if (albums) renderAlbums(albums, container);
-            }).catch(function(e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
-            });
-        }
-
-        function renderAlbums(albums, container) {
-            container.innerHTML = '';
-            for (var i = 0; i < albums.length; i++) {
-                (function(album) {
-                    var card = document.createElement('div');
-                    card.className = 'album-card';
-                    card.onclick = function() { openAlbumDetail(album.id, album.name); };
-                    var coverHTML = album.cover_url
-                        ? '<div class="album-cover"><img src="' + escapeAttr(album.cover_url) + '" alt="' + escapeAttr(album.name) + '" loading="lazy"></div>'
-                        : '<div class="album-cover">&#128444;&#65039;</div>';
-                    var uploaderName = album.uploader_name || DEFAULT_UPLOADER_NAME;
-                    card.innerHTML = coverHTML +
-                        '<div class="album-info">' +
-                            '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
-                            '<div class="album-meta">' + (album.image_count || 0) + ' 张图片</div>' +
-                            '<div class="album-uploader">by ' + escapeHtml(uploaderName) + '</div>' +
-                        '</div>';
-                    if (isAdmin) {
-                        var delBtn = document.createElement('button');
-                        delBtn.className = 'delete-btn show';
-                        delBtn.innerHTML = '&times;';
-                        delBtn.style.zIndex = '10';
-                        delBtn.onclick = function(e) { e.stopPropagation(); deleteAlbum(album.id, album.name); };
-                        card.appendChild(delBtn);
-                    }
-                    container.appendChild(card);
-                })(albums[i]);
+            } else {
+                closeAlbumCreateModal();
+                showToast('相册「' + albumName + '」创建成功');
+                if (currentTab === 'albums') loadAlbums();
             }
-        }
+        }).catch(function(err) {
+            console.error('Create album fail:', err);
+            showToast('创建失败: ' + (err.message || '未知错误'));
+        }).finally(function() {
+            btn.disabled = false;
+            document.getElementById('album-progress').classList.remove('show');
+        });
+    }
 
-        function openAlbumDetail(albumId, albumName) {
-            currentAlbumId = albumId;
-            document.getElementById('album-list-view').style.display = 'none';
-            document.getElementById('album-detail-view').style.display = 'block';
-            document.getElementById('detail-album-name').textContent = albumName;
-            document.querySelectorAll('.tab').forEach(function(t) {
-                t.classList.toggle('active', t.dataset.tab === 'albums');
-            });
-            loadAlbumDetail(albumId);
-        }
+    if (pendingAlbumCover) {
+        var progressEl = document.getElementById('album-progress');
+        var progressBar = document.getElementById('album-progress-bar');
+        progressEl.classList.add('show');
+        progressBar.style.width = '30%';
 
-        function loadAlbumDetail(albumId) {
-            var container = document.getElementById('album-detail-images');
-            container.innerHTML = '<div class="loading">加载中...</div>';
-            supabaseClient.from('images').select('*').eq('album_id', albumId).order('created_at', { ascending: false })
-            .then(function(result) {
-                if (result.error) throw result.error;
-                document.getElementById('detail-album-desc').textContent = (result.data || []).length + ' 张图片';
-                renderImages(result.data || [], container);
-            }).catch(function(e) {
-                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
-            });
-        }
+        compressImage(pendingAlbumCover, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+            var fileName = 'album_cover_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + pendingAlbumCover.name;
+            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed);
+        }).then(function(uploadResult) {
+            if (uploadResult.error) throw uploadResult.error;
+            progressBar.style.width = '70%';
+            var fileName = uploadResult.data.path;
+            coverUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+        }).catch(function(err) {
+            console.warn('Cover upload failed:', err);
+        }).finally(function() {
+            doCreate();
+        });
+    } else {
+        doCreate();
+    }
+}
 
-        function backToAlbumList() {
-            currentAlbumId = null;
-            document.getElementById('album-list-view').style.display = 'block';
-            document.getElementById('album-detail-view').style.display = 'none';
-            loadAlbums();
-        }
 
-        function deleteAlbum(albumId, albumName) {
-            if (!confirm('确定要删除相册「' + albumName + '」吗？')) return;
-            supabaseClient.from('albums').delete().eq('id', albumId)
-            .then(function(result) {
-                if (result.error) throw result.error;
-                showToast('相册已删除');
-                loadAlbums();
-            }).catch(function(e) {
-                showToast('删除失败: ' + e.message);
-            });
-        }
+// ======================================
+// 相册浏览和管理
+// ======================================
+function loadAlbums() {
+    var container = document.getElementById('albums-grid');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    document.getElementById('album-list-view').style.display = 'block';
+    document.getElementById('album-detail-view').style.display = 'none';
 
-        // ======================================
-        // 渲染图片列表（含懒加载）
-        // ======================================
-        function renderImages(images, container) {
-            if (images.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">&#128247;</div><div class="text">还没有图片，快来上传第一张吧~</div></div>';
+    supabaseClient.from('albums').select('*').order('created_at', { ascending: false })
+    .then(function(result) {
+        if (result.error) {
+            if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">相册功能尚未启用<br>请先在 Supabase 创建 albums 表</div></div>';
                 return;
             }
+            throw result.error;
+        }
+        var albums = result.data || [];
+        if (albums.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">还没有相册，点击右侧按钮创建吧</div></div>';
+            return;
+        }
+        var promises = albums.map(function(album) {
+            return supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', album.id)
+            .then(function(r) { album.image_count = r.count || 0; return album; });
+        });
+        return Promise.all(promises);
+    }).then(function(albums) {
+        if (albums) renderAlbums(albums, container);
+    }).catch(function(e) {
+        container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+    });
+}
+
+function renderAlbums(albums, container) {
+    container.innerHTML = '';
+    for (var i = 0; i < albums.length; i++) {
+        (function(album) {
+            var card = document.createElement('div');
+            card.className = 'album-card';
+            card.onclick = function() { openAlbumDetail(album.id, album.name); };
+            var coverHTML = album.cover_url
+                ? '<div class="album-cover"><img src="' + escapeAttr(album.cover_url) + '" alt="' + escapeAttr(album.name) + '" loading="lazy"></div>'
+                : '<div class="album-cover">&#128444;&#65039;</div>';
+            var uploaderName = album.uploader_name || DEFAULT_UPLOADER_NAME;
+            card.innerHTML = coverHTML +
+                '<div class="album-info">' +
+                    '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
+                    '<div class="album-meta">' + (album.image_count || 0) + ' 张图片</div>' +
+                    '<div class="album-uploader">by ' + escapeHtml(uploaderName) + '</div>' +
+                '</div>';
+            if (isAdmin) {
+                var delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn show';
+                delBtn.innerHTML = '&times;';
+                delBtn.style.zIndex = '10';
+                delBtn.onclick = function(e) { e.stopPropagation(); deleteAlbum(album.id, album.name); };
+                card.appendChild(delBtn);
+            }
+            container.appendChild(card);
+        })(albums[i]);
+    }
+}
+
+function openAlbumDetail(albumId, albumName) {
+    currentAlbumId = albumId;
+    document.getElementById('album-list-view').style.display = 'none';
+    document.getElementById('album-detail-view').style.display = 'block';
+    document.getElementById('detail-album-name').textContent = albumName;
+    document.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.tab === 'albums');
+    });
+    loadAlbumDetail(albumId);
+}
+
+function loadAlbumDetail(albumId) {
+    // 重置相册分页状态
+    paginationState.album = { page: 0, hasMore: true, loading: false, allImages: [] };
+    var container = document.getElementById('album-detail-images');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    loadMoreAlbumImages(albumId);
+}
+
+function loadMoreAlbumImages(albumId) {
+    var state = paginationState.album;
+    if (state.loading || !state.hasMore) return;
+    
+    state.loading = true;
+    var container = document.getElementById('album-detail-images');
+    
+    var loadingEl = container.querySelector('.loading-more');
+    if (!loadingEl && state.page > 0) {
+        loadingEl = document.createElement('div');
+        loadingEl.className = 'loading-more';
+        loadingEl.innerHTML = '加载更多...';
+        loadingEl.style.cssText = 'text-align:center;padding:20px;color:#999;';
+        container.appendChild(loadingEl);
+    }
+    
+    supabaseClient.from('images').select('*').eq('album_id', albumId).order('created_at', { ascending: false })
+        .range(state.page * PAGINATION.PAGE_SIZE, (state.page + 1) * PAGINATION.PAGE_SIZE - 1)
+        .then(function(result) {
+            if (loadingEl) loadingEl.remove();
+            
+            if (result.error) throw result.error;
+            
+            var images = result.data || [];
+            if (state.page === 0) {
+                container.innerHTML = '';
+                state.allImages = images;
+                renderImages(images, container, true);
+                // 更新图片数量显示
+                document.getElementById('detail-album-desc').textContent = '加载中...';
+                // 获取总数
+                supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', albumId)
+                    .then(function(r) {
+                        document.getElementById('detail-album-desc').textContent = (r.count || images.length) + ' 张图片';
+                    });
+            } else {
+                state.allImages = state.allImages.concat(images);
+                renderImages(images, container, false);
+            }
+            
+            state.hasMore = images.length === PAGINATION.PAGE_SIZE;
+            state.page++;
+            state.loading = false;
+            
+            if (!state.hasMore && state.page > 1) {
+                var endEl = document.createElement('div');
+                endEl.className = 'no-more-data';
+                endEl.innerHTML = '没有更多了';
+                endEl.style.cssText = 'text-align:center;padding:20px;color:#999;font-size:12px;';
+                container.appendChild(endEl);
+            }
+        }).catch(function(e) {
+            if (loadingEl) loadingEl.remove();
+            state.loading = false;
+            if (state.page === 0) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            } else {
+                showToast('加载更多失败: ' + e.message);
+            }
+        });
+}
+
+function backToAlbumList() {
+    currentAlbumId = null;
+    document.getElementById('album-list-view').style.display = 'block';
+    document.getElementById('album-detail-view').style.display = 'none';
+    loadAlbums();
+}
+
+function deleteAlbum(albumId, albumName) {
+    if (!confirm('确定要删除相册「' + albumName + '」吗？')) return;
+    supabaseClient.from('albums').delete().eq('id', albumId)
+    .then(function(result) {
+        if (result.error) throw result.error;
+        showToast('相册已删除');
+        loadAlbums();
+    }).catch(function(e) {
+        showToast('删除失败: ' + e.message);
+    });
+}
+
+
+// ======================================
+// 图片浏览（最新上传 + 排行榜）+ 点赞 + 删除 + 大图查看 + 无限滚动
+// ======================================
+var likedIds = JSON.parse(safeGet('likedIds', '[]'));
+
+// 分页状态
+var paginationState = {
+    home: { page: 0, hasMore: true, loading: false, allImages: [] },
+    ranking: { page: 0, hasMore: true, loading: false, allImages: [] }
+};
+
+// 重置分页状态
+function resetPagination(type) {
+    paginationState[type] = { page: 0, hasMore: true, loading: false, allImages: [] };
+}
+
+function loadImages() {
+    resetPagination('home');
+    var container = document.getElementById('home-images');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    loadMoreImages('home');
+}
+
+function loadRanking() {
+    resetPagination('ranking');
+    var container = document.getElementById('ranking-images');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    loadMoreRanking();
+}
+
+// 加载更多图片（最新上传）
+function loadMoreImages(type) {
+    var state = paginationState[type];
+    if (state.loading || !state.hasMore) return;
+    
+    state.loading = true;
+    var container = document.getElementById(type === 'home' ? 'home-images' : 'album-detail-images');
+    
+    // 移除加载中提示（如果不是第一页）
+    var loadingEl = container.querySelector('.loading-more');
+    if (!loadingEl && state.page > 0) {
+        loadingEl = document.createElement('div');
+        loadingEl.className = 'loading-more';
+        loadingEl.innerHTML = '加载更多...';
+        loadingEl.style.cssText = 'text-align:center;padding:20px;color:#999;';
+        container.appendChild(loadingEl);
+    }
+    
+    var query = supabaseClient.from('images').select('*').order('created_at', { ascending: false })
+        .range(state.page * PAGINATION.PAGE_SIZE, (state.page + 1) * PAGINATION.PAGE_SIZE - 1);
+    
+    // 如果是相册详情页，添加相册过滤
+    if (type === 'album' && currentAlbumId) {
+        query = query.eq('album_id', currentAlbumId);
+    }
+    
+    query.then(function(result) {
+        if (loadingEl) loadingEl.remove();
+        
+        if (result.error) throw result.error;
+        
+        var images = result.data || [];
+        if (state.page === 0) {
+            // 第一页：清空并渲染
             container.innerHTML = '';
-            for (var i = 0; i < images.length; i++) {
-                (function(img) {
-                    var id = img.id;
-                    var url = img.url;
-                    var likeCount = img.like_count || 0;
-                    var uploaderId = img.uploader_id;
-                    var uploaderName = img.uploader_name || DEFAULT_UPLOADER_NAME;
-                    var isLiked = likedIds.indexOf(id) !== -1;
-                    var canDelete = isAdmin || (currentUser && uploaderId === currentUser.id);
+            state.allImages = images;
+            renderImages(images, container, true);
+        } else {
+            // 后续页：追加渲染
+            state.allImages = state.allImages.concat(images);
+            renderImages(images, container, false);
+        }
+        
+        state.hasMore = images.length === PAGINATION.PAGE_SIZE;
+        state.page++;
+        state.loading = false;
+        
+        // 如果没有更多数据且不是第一页，显示提示
+        if (!state.hasMore && state.page > 1) {
+            var endEl = document.createElement('div');
+            endEl.className = 'no-more-data';
+            endEl.innerHTML = '没有更多了';
+            endEl.style.cssText = 'text-align:center;padding:20px;color:#999;font-size:12px;';
+            container.appendChild(endEl);
+        }
+    }).catch(function(e) {
+        if (loadingEl) loadingEl.remove();
+        state.loading = false;
+        if (state.page === 0) {
+            container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+        } else {
+            showToast('加载更多失败: ' + e.message);
+        }
+    });
+}
 
-                    var card = document.createElement('div');
-                    card.className = 'image-card';
+// 加载更多排行榜
+function loadMoreRanking() {
+    var state = paginationState.ranking;
+    if (state.loading || !state.hasMore) return;
+    
+    state.loading = true;
+    var container = document.getElementById('ranking-images');
+    
+    var loadingEl = container.querySelector('.loading-more');
+    if (!loadingEl && state.page > 0) {
+        loadingEl = document.createElement('div');
+        loadingEl.className = 'loading-more';
+        loadingEl.innerHTML = '加载更多...';
+        loadingEl.style.cssText = 'text-align:center;padding:20px;color:#999;';
+        container.appendChild(loadingEl);
+    }
+    
+    supabaseClient.from('images').select('*').order('like_count', { ascending: false })
+        .range(state.page * PAGINATION.PAGE_SIZE, (state.page + 1) * PAGINATION.PAGE_SIZE - 1)
+        .then(function(result) {
+            if (loadingEl) loadingEl.remove();
+            
+            if (result.error) throw result.error;
+            
+            var images = result.data || [];
+            if (state.page === 0) {
+                container.innerHTML = '';
+                state.allImages = images;
+                renderImages(images, container, true);
+            } else {
+                state.allImages = state.allImages.concat(images);
+                renderImages(images, container, false);
+            }
+            
+            state.hasMore = images.length === PAGINATION.PAGE_SIZE;
+            state.page++;
+            state.loading = false;
+            
+            if (!state.hasMore && state.page > 1) {
+                var endEl = document.createElement('div');
+                endEl.className = 'no-more-data';
+                endEl.innerHTML = '没有更多了';
+                endEl.style.cssText = 'text-align:center;padding:20px;color:#999;font-size:12px;';
+                container.appendChild(endEl);
+            }
+        }).catch(function(e) {
+            if (loadingEl) loadingEl.remove();
+            state.loading = false;
+            if (state.page === 0) {
+                container.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+            } else {
+                showToast('加载更多失败: ' + e.message);
+            }
+        });
+}
 
-                    var imgEl = document.createElement('img');
-                    imgEl.alt = '图片';
-                    // 懒加载：使用 data-src，滚动到可视区域时才加载
-                    lazyLoadImage(imgEl, url);
-                    imgEl.onclick = function() { openModal(url, uploaderName); };
-                    card.appendChild(imgEl);
-
-                    if (canDelete) {
-                        var delBtn = document.createElement('button');
-                        delBtn.className = 'delete-btn show';
-                        delBtn.innerHTML = '&times;';
-                        delBtn.onclick = function() { deleteImage(id, url); };
-                        card.appendChild(delBtn);
-                    }
-
-                    var infoDiv = document.createElement('div');
-                    infoDiv.className = 'image-info';
-
-                    var nameSpan = document.createElement('span');
-                    nameSpan.className = 'image-uploader-name';
-                    nameSpan.title = uploaderName;
-                    nameSpan.textContent = uploaderName;
-                    infoDiv.appendChild(nameSpan);
-
-                    var likeBtn = document.createElement('button');
-                    likeBtn.className = 'like-btn' + (isLiked ? ' liked' : '');
-                    likeBtn.innerHTML = '&#10084; ' + likeCount;
-                    likeBtn.onclick = function() { likeImage(id, likeBtn); };
-                    infoDiv.appendChild(likeBtn);
-
-                    card.appendChild(infoDiv);
-                    container.appendChild(card);
-                })(images[i]);
+// 设置无限滚动监听
+function setupInfiniteScroll() {
+    var scrollHandler = function() {
+        // 检查是否接近底部
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        var windowHeight = window.innerHeight;
+        var docHeight = document.documentElement.scrollHeight;
+        
+        // 距离底部 200px 时触发加载
+        if (scrollTop + windowHeight >= docHeight - 200) {
+            if (currentTab === 'home') {
+                loadMoreImages('home');
+            } else if (currentTab === 'ranking') {
+                loadMoreRanking();
+            } else if (currentTab === 'albums' && currentAlbumId) {
+                loadMoreImages('album');
             }
         }
+    };
+    
+    // 使用节流避免频繁触发
+    var throttleTimer = null;
+    window.addEventListener('scroll', function() {
+        if (throttleTimer) return;
+        throttleTimer = setTimeout(function() {
+            scrollHandler();
+            throttleTimer = null;
+        }, 200);
+    });
+}
 
-        // ======================================
-        // 点赞
-        // ======================================
-        function likeImage(imageId, btn) {
-            if (likedIds.indexOf(imageId) !== -1) {
-                showToast('你已经点过赞啦');
+function renderImages(images, container, clearFirst) {
+    if (images.length === 0 && clearFirst) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">&#128247;</div><div class="text">还没有图片，快来上传第一张吧~</div></div>';
+        return;
+    }
+    if (clearFirst) {
+        container.innerHTML = '';
+    }
+    for (var i = 0; i < images.length; i++) {
+        (function(img) {
+            var id = img.id;
+            var url = img.url;
+            var likeCount = img.like_count || 0;
+            var uploaderId = img.uploader_id;
+            var uploaderName = img.uploader_name || DEFAULT_UPLOADER_NAME;
+            var createdAt = img.created_at;
+            var isLiked = likedIds.indexOf(id) !== -1;
+            var canDelete = isAdmin || (currentUser && uploaderId === currentUser.id);
+
+            var card = document.createElement('div');
+            card.className = 'image-card';
+            card.dataset.imageId = id; // 用于大图导航
+
+            var imgEl = document.createElement('img');
+            imgEl.alt = '图片';
+            // 懒加载：使用 data-src，滚动到可视区域时才加载
+            // 传入图片ID用于带宽统计
+            lazyLoadImage(imgEl, url, id);
+            imgEl.onclick = function() { openModalWithBandwidthCheck(url, uploaderName, id); };
+            card.appendChild(imgEl);
+
+            if (canDelete) {
+                var delBtn = document.createElement('button');
+                delBtn.className = 'delete-btn show';
+                delBtn.innerHTML = '&times;';
+                delBtn.onclick = function(e) { e.stopPropagation(); deleteImage(id, url); };
+                card.appendChild(delBtn);
+            }
+
+            var infoDiv = document.createElement('div');
+            infoDiv.className = 'image-info';
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'image-uploader-name';
+            nameSpan.title = uploaderName;
+            nameSpan.textContent = uploaderName;
+            infoDiv.appendChild(nameSpan);
+
+            // 上传时间
+            var timeSpan = document.createElement('span');
+            timeSpan.className = 'image-time';
+            timeSpan.textContent = formatTime(createdAt);
+            timeSpan.title = createdAt ? new Date(createdAt).toLocaleString() : '';
+            infoDiv.appendChild(timeSpan);
+
+            var likeBtn = document.createElement('button');
+            likeBtn.className = 'like-btn' + (isLiked ? ' liked' : '');
+            likeBtn.innerHTML = '&#10084; ' + likeCount;
+            likeBtn.onclick = function(e) { e.stopPropagation(); likeImage(id, likeBtn); };
+            infoDiv.appendChild(likeBtn);
+
+            card.appendChild(infoDiv);
+            container.appendChild(card);
+        })(images[i]);
+    }
+}
+
+// 格式化时间显示
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    var date = new Date(timestamp);
+    var now = new Date();
+    var diff = now - date;
+    
+    // 小于1分钟
+    if (diff < 60000) return '刚刚';
+    // 小于1小时
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    // 小于24小时
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    // 小于7天
+    if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+    
+    // 超过7天显示日期
+    var month = date.getMonth() + 1;
+    var day = date.getDate();
+    return month + '-' + day;
+}
+
+// ======================================
+// 点赞
+// ======================================
+function likeImage(imageId, btn) {
+    if (likedIds.indexOf(imageId) !== -1) {
+        showToast('你已经点过赞啦');
+        return;
+    }
+    supabaseClient.from('images').select('like_count').eq('id', imageId).single()
+    .then(function(result) {
+        if (result.error) throw result.error;
+        return supabaseClient.from('images').update({ like_count: result.data.like_count + 1 }).eq('id', imageId);
+    }).then(function(result) {
+        if (result && result.error) throw result.error;
+        likedIds.push(imageId);
+        safeSet('likedIds', JSON.stringify(likedIds));
+        btn.classList.add('liked');
+        return supabaseClient.from('images').select('like_count').eq('id', imageId).single();
+    }).then(function(result) {
+        if (result && result.data) {
+            btn.innerHTML = '&#10084; ' + result.data.like_count;
+        }
+        showToast('点赞成功！');
+    }).catch(function(e) {
+        showToast('点赞失败: ' + e.message);
+    });
+}
+
+// ======================================
+// 删除图片
+// ======================================
+function deleteImage(imageId, url) {
+    if (!confirm('确定要删除这张图片吗？')) return;
+    var fileName = url.split('/').pop();
+    supabaseClient.storage.from(STORAGE_BUCKET).remove([fileName])
+    .then(function(result) {
+        if (result.error) console.warn('文件删除警告:', result.error);
+        return supabaseClient.from('images').delete().eq('id', imageId);
+    }).then(function(result) {
+        if (result.error) throw result.error;
+        showToast('删除成功！');
+        refreshCurrentView();
+    }).catch(function(e) {
+        showToast('删除失败: ' + e.message);
+    });
+}
+
+// ======================================
+// 大图查看（带带宽检查 + 左右切换 + 内嵌操作）
+// ======================================
+var currentModalImageIndex = -1;
+var currentModalImages = [];
+
+function openModalWithBandwidthCheck(url, uploaderName, imageId) {
+    // 先检查带宽（预估大图约 200KB）
+    var check = checkBandwidthLimit(200 * 1024);
+    if (!check.allowed) {
+        showBandwidthLimitExceeded();
+        return;
+    }
+    
+    // 记录下载带宽
+    var userId = currentUser ? currentUser.id : null;
+    addBandwidthUsage(userId, 0, 200 * 1024);
+    
+    // 获取当前视图的图片列表用于导航
+    currentModalImages = getCurrentViewImages();
+    currentModalImageIndex = currentModalImages.findIndex(function(img) { return img.id === imageId; });
+    
+    // 打开大图
+    openModal(url, uploaderName, imageId);
+}
+
+function getCurrentViewImages() {
+    // 根据当前标签返回对应的图片列表
+    if (currentTab === 'home') return paginationState.home.allImages;
+    if (currentTab === 'ranking') return paginationState.ranking.allImages;
+    if (currentTab === 'albums' && currentAlbumId) {
+        // 从相册详情容器获取
+        var container = document.getElementById('album-detail-images');
+        var cards = container.querySelectorAll('.image-card');
+        var images = [];
+        cards.forEach(function(card) {
+            var imgId = card.dataset.imageId;
+            var imgData = paginationState.album && paginationState.album.allImages ? 
+                paginationState.album.allImages.find(function(i) { return i.id === imgId; }) : null;
+            if (imgData) images.push(imgData);
+        });
+        return images;
+    }
+    return [];
+}
+
+function openModal(url, uploaderName, imageId) {
+    var modal = document.getElementById('image-modal');
+    document.getElementById('modal-img').src = url;
+    document.getElementById('modal-uploader').textContent = 'by ' + (uploaderName || DEFAULT_UPLOADER_NAME);
+    
+    // 更新导航按钮状态
+    updateModalNavButtons();
+    
+    // 更新内嵌操作按钮
+    updateModalActions(imageId);
+    
+    modal.classList.add('show');
+}
+
+function updateModalNavButtons() {
+    var prevBtn = document.getElementById('modal-prev');
+    var nextBtn = document.getElementById('modal-next');
+    
+    if (prevBtn) {
+        prevBtn.style.visibility = currentModalImageIndex > 0 ? 'visible' : 'hidden';
+    }
+    if (nextBtn) {
+        nextBtn.style.visibility = currentModalImageIndex < currentModalImages.length - 1 ? 'visible' : 'hidden';
+    }
+}
+
+function updateModalActions(imageId) {
+    var likeBtn = document.getElementById('modal-like-btn');
+    var deleteBtn = document.getElementById('modal-delete-btn');
+    
+    if (!imageId) return;
+    
+    var img = currentModalImages.find(function(i) { return i.id === imageId; });
+    if (!img) return;
+    
+    // 更新点赞按钮
+    if (likeBtn) {
+        var isLiked = likedIds.indexOf(imageId) !== -1;
+        likeBtn.className = 'modal-action-btn like-btn' + (isLiked ? ' liked' : '');
+        likeBtn.innerHTML = '&#10084; ' + (img.like_count || 0);
+        likeBtn.onclick = function() { 
+            likeImageFromModal(imageId); 
+        };
+    }
+    
+    // 更新删除按钮
+    if (deleteBtn) {
+        var canDelete = isAdmin || (currentUser && img.uploader_id === currentUser.id);
+        deleteBtn.style.display = canDelete ? 'flex' : 'none';
+        deleteBtn.onclick = function() { 
+            if (confirm('确定要删除这张图片吗？')) {
+                deleteImage(imageId, img.url);
+                closeModal();
+            }
+        };
+    }
+}
+
+function likeImageFromModal(imageId) {
+    var btn = document.getElementById('modal-like-btn');
+    likeImage(imageId, btn);
+    // 更新本地数据
+    var img = currentModalImages.find(function(i) { return i.id === imageId; });
+    if (img && likedIds.indexOf(imageId) === -1) {
+        img.like_count = (img.like_count || 0) + 1;
+        setTimeout(function() {
+            btn.innerHTML = '&#10084; ' + img.like_count;
+        }, 300);
+    }
+}
+
+function showPrevImage() {
+    if (currentModalImageIndex <= 0) return;
+    
+    currentModalImageIndex--;
+    var img = currentModalImages[currentModalImageIndex];
+    if (!img) return;
+    
+    // 检查带宽
+    var check = checkBandwidthLimit(200 * 1024);
+    if (!check.allowed) {
+        showBandwidthLimitExceeded();
+        currentModalImageIndex++; // 恢复索引
+        return;
+    }
+    
+    // 记录下载带宽
+    var userId = currentUser ? currentUser.id : null;
+    addBandwidthUsage(userId, 0, 200 * 1024);
+    
+    // 更新显示
+    document.getElementById('modal-img').src = img.url;
+    document.getElementById('modal-uploader').textContent = 'by ' + (img.uploader_name || DEFAULT_UPLOADER_NAME);
+    updateModalNavButtons();
+    updateModalActions(img.id);
+}
+
+function showNextImage() {
+    if (currentModalImageIndex >= currentModalImages.length - 1) return;
+    
+    currentModalImageIndex++;
+    var img = currentModalImages[currentModalImageIndex];
+    if (!img) return;
+    
+    // 检查带宽
+    var check = checkBandwidthLimit(200 * 1024);
+    if (!check.allowed) {
+        showBandwidthLimitExceeded();
+        currentModalImageIndex--; // 恢复索引
+        return;
+    }
+    
+    // 记录下载带宽
+    var userId = currentUser ? currentUser.id : null;
+    addBandwidthUsage(userId, 0, 200 * 1024);
+    
+    // 更新显示
+    document.getElementById('modal-img').src = img.url;
+    document.getElementById('modal-uploader').textContent = 'by ' + (img.uploader_name || DEFAULT_UPLOADER_NAME);
+    updateModalNavButtons();
+    updateModalActions(img.id);
+}
+
+function closeModal() {
+    document.getElementById('image-modal').classList.remove('show');
+    document.getElementById('modal-img').src = '';
+    currentModalImageIndex = -1;
+    currentModalImages = [];
+}
+
+// 键盘导航
+function setupModalKeyboardNav() {
+    document.addEventListener('keydown', function(e) {
+        var modal = document.getElementById('image-modal');
+        if (!modal.classList.contains('show')) return;
+        
+        if (e.key === 'ArrowLeft') {
+            showPrevImage();
+        } else if (e.key === 'ArrowRight') {
+            showNextImage();
+        } else if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+}
+
+
+// ======================================
+// UI 交互（Tab 切换、拖拽、弹窗、初始化）
+// ======================================
+var currentTab = 'home';
+var currentAlbumId = null;
+
+// 初始化 Supabase
+var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ======================================
+// 页面初始化
+// ======================================
+document.addEventListener('DOMContentLoaded', function() {
+    setupLazyLoad();
+    loadUserSession();
+
+    // 检查免责声明
+    initDisclaimer();
+
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var tabName = this.dataset.tab;
+            if (tabName === 'albums' && currentTab === 'albums' && currentAlbumId) {
+                backToAlbumList();
                 return;
             }
-            supabaseClient.from('images').select('like_count').eq('id', imageId).single()
-            .then(function(result) {
-                if (result.error) throw result.error;
-                return supabaseClient.from('images').update({ like_count: result.data.like_count + 1 }).eq('id', imageId);
-            }).then(function(result) {
-                if (result && result.error) throw result.error;
-                likedIds.push(imageId);
-                safeSet('likedIds', JSON.stringify(likedIds));
-                btn.classList.add('liked');
-                return supabaseClient.from('images').select('like_count').eq('id', imageId).single();
-            }).then(function(result) {
-                if (result && result.data) {
-                    btn.innerHTML = '&#10084; ' + result.data.like_count;
-                }
-                showToast('点赞成功！');
-            }).catch(function(e) {
-                showToast('点赞失败: ' + e.message);
-            });
-        }
+            switchTab(tabName);
+        });
+    });
 
-        // ======================================
-        // 删除图片
-        // ======================================
-        function deleteImage(imageId, url) {
-            if (!confirm('确定要删除这张图片吗？')) return;
-            var fileName = url.split('/').pop();
-            supabaseClient.storage.from(STORAGE_BUCKET).remove([fileName])
-            .then(function(result) {
-                if (result.error) console.warn('文件删除警告:', result.error);
-                return supabaseClient.from('images').delete().eq('id', imageId);
-            }).then(function(result) {
-                if (result.error) throw result.error;
-                showToast('删除成功！');
-                refreshCurrentView();
-            }).catch(function(e) {
-                showToast('删除失败: ' + e.message);
-            });
-        }
+    // 文件选择
+    document.getElementById('file-input-image').addEventListener('change', function(e) {
+        handleFileSelect(e.target.files, 'image');
+    });
+    document.getElementById('file-input-album-cover').addEventListener('change', function(e) {
+        handleFileSelect(e.target.files, 'cover');
+    });
 
-        // ======================================
-        // 大图查看
-        // ======================================
-        function openModal(url, uploaderName) {
-            document.getElementById('modal-img').src = url;
-            document.getElementById('modal-uploader').textContent = 'by ' + (uploaderName || DEFAULT_UPLOADER_NAME);
-            document.getElementById('image-modal').classList.add('show');
-        }
+    // 拖拽上传
+    setupDragDrop('upload-drop', 'image');
+    setupDragDrop('album-cover-drop', 'cover');
 
-        function closeModal() {
-            document.getElementById('image-modal').classList.remove('show');
-            document.getElementById('modal-img').src = '';
-        }
+    // 弹窗关闭
+    document.getElementById('image-modal').addEventListener('click', function(e) {
+        if (e.target === this || e.target.classList.contains('close')) closeModal();
+    });
+    document.getElementById('upload-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeUploadModal();
+    });
+    document.getElementById('album-create-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeAlbumCreateModal();
+    });
+    document.getElementById('auth-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeAuthModal();
+    });
+
+    // 管理员状态恢复
+    if (isAdmin) {
+        document.getElementById('admin-toggle-btn').classList.add('active');
+        document.getElementById('admin-pwd').placeholder = '已登录管理';
+        document.getElementById('admin-pwd').disabled = true;
+        document.getElementById('admin-panel').style.display = 'flex';
+        loadWhitelist();
+        loadBlacklist();
+        loadBandwidthStats();
+        loadSupabaseQuota();
+    }
+
+    // 更新带宽显示
+    updateBandwidthDisplay();
+
+    // 设置无限滚动
+    setupInfiniteScroll();
+    
+    // 设置大图键盘导航
+    setupModalKeyboardNav();
+
+    loadImages();
+});
+
+// ======================================
+// 免责声明
+// ======================================
+function initDisclaimer() {
+    if (hasAgreedDisclaimer()) return;
+    
+    var modal = document.getElementById('disclaimer-modal');
+    var checkbox = document.getElementById('disclaimer-agree');
+    var confirmBtn = document.getElementById('disclaimer-confirm-btn');
+    
+    // 勾选框变化时更新按钮状态
+    checkbox.addEventListener('change', function() {
+        confirmBtn.disabled = !this.checked;
+    });
+    
+    // 显示弹窗
+    modal.classList.add('show');
+}
+
+function confirmDisclaimer() {
+    var checkbox = document.getElementById('disclaimer-agree');
+    if (!checkbox.checked) return;
+    
+    setDisclaimerAgreed();
+    document.getElementById('disclaimer-modal').classList.remove('show');
+}
+
+function setupDragDrop(dropId, type) {
+    var dz = document.getElementById(dropId);
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
+    dz.addEventListener('drop', function(e) {
+        e.preventDefault(); dz.classList.remove('dragover');
+        handleFileSelect(e.dataTransfer.files, type);
+    });
+}
+
+// ======================================
+// Tab 切换
+// ======================================
+function switchTab(tabName) {
+    currentTab = tabName;
+    currentAlbumId = null;
+    document.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.tab === tabName);
+    });
+    document.getElementById('home-panel').style.display = tabName === 'home' ? 'block' : 'none';
+    document.getElementById('albums-panel').style.display = tabName === 'albums' ? 'block' : 'none';
+    document.getElementById('ranking-panel').style.display = tabName === 'ranking' ? 'block' : 'none';
+    if (tabName === 'home') loadImages();
+    else if (tabName === 'albums') loadAlbums();
+    else if (tabName === 'ranking') loadRanking();
+}
+
+function refreshCurrentView() {
+    if (currentTab === 'home') loadImages();
+    else if (currentTab === 'albums') {
+        if (currentAlbumId) loadAlbumDetail(currentAlbumId);
+        else loadAlbums();
+    }
+    else if (currentTab === 'ranking') loadRanking();
+}
+
+// ======================================
+// 带宽显示更新
+// ======================================
+function updateBandwidthDisplay() {
+    var badge = document.getElementById('bandwidth-badge');
+    if (!badge) return;
+    
+    var userType = defineCurrentUserType();
+    var limit = getBandwidthLimit(userType);
+    var userId = currentUser ? currentUser.id : null;
+    var usage = getBandwidthUsage(userId);
+    var used = usage.upload + usage.download;
+    
+    if (userType === 'admin') {
+        badge.textContent = '带宽：无限制';
+        badge.style.display = 'inline-block';
+        badge.style.background = '#4CAF50';
+        return;
+    }
+    
+    var percent = (used / limit * 100).toFixed(0);
+    badge.textContent = '带宽：' + formatBytes(used) + ' / ' + formatBytes(limit) + ' (' + percent + '%)';
+    badge.style.display = 'inline-block';
+    
+    // 根据使用率改变颜色
+    if (percent >= 90) {
+        badge.style.background = '#f44336'; // 红色警告
+    } else if (percent >= 70) {
+        badge.style.background = '#ff9800'; // 橙色提醒
+    } else {
+        badge.style.background = '#2196F3'; // 蓝色正常
+    }
+}
+
     </script>
 </body>
 </html>
