@@ -369,6 +369,158 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             justify-content: center;
         }
 
+        /* ===== v4 新增：搜索栏 ===== */
+        .search-bar {
+            background: white; padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+        }
+        .search-type-tabs {
+            display: flex; gap: 8px; margin-bottom: 8px;
+        }
+        .search-type-tab {
+            padding: 4px 12px; border-radius: 12px;
+            font-size: 12px; color: #666; cursor: pointer;
+            background: #f5f5f5; transition: all 0.2s;
+        }
+        .search-type-tab.active {
+            background: #2196F3; color: white;
+        }
+        .search-input-row {
+            display: flex; gap: 8px;
+        }
+        .search-input-row input {
+            flex: 1; padding: 8px 12px; border: 1px solid #ddd;
+            border-radius: 6px; outline: none; font-size: 14px;
+        }
+        .search-input-row button {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            background: #2196F3; color: white; cursor: pointer;
+        }
+        .search-filters {
+            display: flex; gap: 16px; margin-top: 8px;
+            font-size: 12px; color: #666;
+        }
+        .search-filters label {
+            display: flex; align-items: center; gap: 4px; cursor: pointer;
+        }
+
+        /* ===== v4 新增：搜索结果 ===== */
+        .search-results-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px; background: white; margin: 16px;
+            border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .search-results-header h4 {
+            font-size: 16px; color: #333;
+        }
+        .btn-clear-search {
+            padding: 6px 12px; border: 1px solid #ddd;
+            background: white; border-radius: 6px;
+            font-size: 12px; color: #666; cursor: pointer;
+        }
+        #search-results-content h4 {
+            padding: 16px 16px 8px; font-size: 14px; color: #666;
+        }
+
+        /* ===== v4 新增：作者卡片 ===== */
+        .authors-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px; padding: 0 16px 16px;
+        }
+        .author-card {
+            background: white; border-radius: 12px; padding: 16px;
+            text-align: center; cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        .author-card:hover {
+            transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .author-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: #e3f2fd; color: #2196F3;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; margin: 0 auto 8px;
+        }
+        .author-name {
+            font-size: 13px; font-weight: 500; color: #333;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .author-stats {
+            font-size: 11px; color: #999; margin-top: 4px;
+        }
+
+        /* ===== v4 新增：相册卡片增强 ===== */
+        .album-card .album-no-cover {
+            flex-direction: column; gap: 8px;
+            font-size: 32px;
+        }
+        .album-card .album-no-cover span {
+            font-size: 12px; color: #bbb;
+        }
+        .album-card .album-desc-preview {
+            font-size: 11px; color: #999;
+            margin: 4px 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+        .album-card .album-tags {
+            font-size: 11px; color: #2196F3; margin: 4px 0;
+        }
+        .album-card .album-meta-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 6px;
+        }
+        .album-card .album-count {
+            font-size: 11px; color: #999;
+        }
+        .album-card .album-uploader {
+            font-size: 11px; color: #2196F3; cursor: pointer;
+        }
+        .album-card .album-uploader:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== v4 新增：相册详情页 ===== */
+        .album-detail-info {
+            flex: 1;
+        }
+        .album-detail-info .album-tags {
+            font-size: 12px; color: #2196F3; margin-top: 4px;
+        }
+        .album-detail-actions {
+            padding: 0 16px 16px;
+        }
+        .btn-upload-to-album {
+            width: 100%; padding: 12px;
+            background: #4CAF50; color: white;
+            border: none; border-radius: 8px;
+            font-size: 14px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-upload-to-album:hover {
+            background: #45a049;
+        }
+
+        /* ===== v4 新增：表单样式 ===== */
+        .form-group textarea {
+            width: 100%; padding: 8px 12px;
+            border: 1px solid #ddd; border-radius: 6px;
+            outline: none; font-size: 14px; resize: vertical;
+            font-family: inherit;
+        }
+        .input-hint {
+            font-size: 11px; color: #999; margin-top: 4px;
+        }
+        .file-item {
+            padding: 4px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .progress-text {
+            font-size: 11px; color: #666; text-align: center; margin-top: 4px;
+        }
+
     </style>
 </head>
 <body>
@@ -443,11 +595,28 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </div>
     </div>
 
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+        <div class="search-type-tabs">
+            <div class="search-type-tab active" data-search-type="tag">标签</div>
+            <div class="search-type-tab" data-search-type="author">作者</div>
+        </div>
+        <div class="search-input-row">
+            <input type="text" id="search-input" placeholder="搜索标签，如：风景 人物">
+            <button onclick="performSearch()">&#128269;</button>
+        </div>
+        <div class="search-filters" id="search-filters">
+            <label><input type="checkbox" id="search-images" checked> 图片</label>
+            <label><input type="checkbox" id="search-albums" checked> 相册</label>
+        </div>
+    </div>
+
     <!-- Tab 栏 -->
     <div class="tabs">
         <div class="tab active" data-tab="home">最新上传</div>
         <div class="tab" data-tab="albums">相册</div>
         <div class="tab" data-tab="ranking">排行榜</div>
+        <div class="tab" data-tab="search" id="search-tab" style="display:none;">搜索结果</div>
     </div>
 
     <!-- 各面板 -->
@@ -468,18 +637,36 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <div id="album-detail-view" style="display: none;">
             <div class="album-detail-header">
                 <button class="back-btn" onclick="backToAlbumList()">&#8592;</button>
-                <div>
+                <div class="album-detail-info">
                     <div class="album-title" id="detail-album-name"></div>
-                    <div class="album-desc" id="detail-album-desc"></div>
+                    <div class="album-tags" id="detail-album-tags" style="display:none;"></div>
+                    <div class="album-desc" id="detail-album-desc" style="display:none;"></div>
                 </div>
             </div>
-            <div style="padding-top:12px;"></div>
+            <div class="album-detail-actions">
+                <button class="btn-upload-to-album" onclick="openAlbumUploadModal(currentAlbumId)">
+                    &#128247; 上传图片到相册
+                </button>
+            </div>
             <div class="images-grid" id="album-detail-images"></div>
         </div>
     </div>
 
     <div id="ranking-panel" style="display: none;">
         <div class="images-grid" id="ranking-images"></div>
+    </div>
+
+    <!-- 搜索结果面板 -->
+    <div id="search-panel" style="display: none;">
+        <div class="search-results-header">
+            <span id="search-results-title">搜索结果</span>
+            <button class="btn-clear-search" onclick="clearSearch()">清除搜索</button>
+        </div>
+        <div id="search-results-content">
+            <div class="images-grid" id="search-images-results"></div>
+            <div class="albums-grid" id="search-albums-results"></div>
+            <div class="authors-list" id="search-authors-results"></div>
+        </div>
     </div>
 
     <!-- 大图查看 -->
@@ -550,7 +737,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </div>
     </div>
 
-    <!-- 上传图片弹窗 -->
+    <!-- 上传图片弹窗（v4 新版：添加标签输入） -->
     <div class="modal-overlay" id="upload-modal">
         <div class="modal-panel">
             <h3>&#128247; 上传图片</h3>
@@ -559,6 +746,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <select id="upload-album-select">
                     <option value="">不放入相册</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>标签（最多3个，用空格或逗号分隔）</label>
+                <input type="text" id="upload-tags-input" placeholder="例如：风景 旅行 2024" maxlength="50">
+                <div class="input-hint">标签用于搜索，如：#风景 #旅行</div>
             </div>
             <div class="upload-drop" id="upload-drop" onclick="document.getElementById('file-input-image').click()">
                 <div class="icon">&#128228;</div>
@@ -577,26 +769,53 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </div>
     </div>
 
-    <!-- 创建相册弹窗 -->
+    <!-- 创建相册弹窗（v4 新版） -->
     <div class="modal-overlay" id="album-create-modal">
         <div class="modal-panel">
             <h3>&#128218; 创建相册</h3>
             <div class="form-group">
-                <label>相册名称</label>
-                <input type="text" id="album-name-input" placeholder="给相册起个名字" maxlength="30">
+                <label>相册名称 *</label>
+                <input type="text" id="album-name-input" placeholder="给相册起个名字" maxlength="30" oninput="onAlbumFormInput()">
             </div>
-            <div class="upload-drop" id="album-cover-drop" onclick="document.getElementById('file-input-album-cover').click()">
-                <div class="icon">&#127912;</div>
-                <div class="text">点击选择封面图片（选填）</div>
+            <div class="form-group">
+                <label>相册描述</label>
+                <textarea id="album-desc-input" placeholder="简单描述一下这个相册（选填）" maxlength="200" rows="3"></textarea>
             </div>
-            <input type="file" class="hidden-input" id="file-input-album-cover" accept="image/*">
-            <div class="file-list" id="album-cover-file-list"></div>
-            <div class="progress-bar" id="album-progress">
-                <div class="progress" id="album-progress-bar"></div>
+            <div class="form-group">
+                <label>标签（最多3个，用空格或逗号分隔）</label>
+                <input type="text" id="album-tags-input" placeholder="例如：风景 旅行 2024" maxlength="50">
+                <div class="input-hint">标签用于搜索，如：#风景 #旅行</div>
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeAlbumCreateModal()">取消</button>
                 <button class="btn-confirm purple" id="album-confirm-btn" onclick="confirmCreateAlbum()" disabled>创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 相册内上传弹窗（v4 新版） -->
+    <div class="modal-overlay" id="album-upload-modal">
+        <div class="modal-panel">
+            <h3>&#128247; 上传图片到相册</h3>
+            <div class="form-group">
+                <label>标签（最多3个，应用于本次上传的所有图片）</label>
+                <input type="text" id="album-upload-tags" placeholder="例如：风景 旅行" maxlength="50">
+                <div class="input-hint">这些标签会添加到每张上传的图片</div>
+            </div>
+            <div class="upload-drop" id="album-upload-drop" onclick="document.getElementById('file-input-album-upload').click()">
+                <div class="icon">&#128228;</div>
+                <div class="text">点击选择图片或拖拽到此处</div>
+                <div class="compress-info">支持批量选择多张图片</div>
+            </div>
+            <input type="file" class="hidden-input" id="file-input-album-upload" multiple accept="image/*">
+            <div class="file-list" id="album-upload-file-list"></div>
+            <div class="progress-bar" id="album-upload-progress">
+                <div class="progress" id="album-upload-progress-bar"></div>
+                <div class="progress-text" id="album-upload-progress-text"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeAlbumUploadModal()">取消</button>
+                <button class="btn-confirm" id="album-upload-confirm-btn" onclick="confirmAlbumUpload()" disabled>上传</button>
             </div>
         </div>
     </div>
@@ -658,6 +877,13 @@ var BANDWIDTH_LIMIT = {
 // 分页配置
 var PAGINATION = {
     PAGE_SIZE: 12  // 每页加载图片数量
+};
+
+// 标签配置
+var TAGS_CONFIG = {
+    MAX_TAGS_PER_ITEM: 3,      // 每个项目最多标签数
+    MAX_TAGS_PER_ALBUM: 5,     // 相册最多标签数（自动合并）
+    MAX_TAG_LENGTH: 20         // 单个标签最大长度
 };
 
 
@@ -1659,8 +1885,16 @@ function confirmUpload() {
     if (pendingFiles.length === 0) return;
 
     var albumId = document.getElementById('upload-album-select').value;
+    var tagsInput = document.getElementById('upload-tags-input').value.trim();
     var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
     var uploaderId = currentUser ? currentUser.id : null;
+
+    // 解析标签
+    var tags = parseTags(tagsInput);
+    if (tags.length > TAGS_CONFIG.MAX_TAGS_PER_ITEM) {
+        showToast('最多只能添加 ' + TAGS_CONFIG.MAX_TAGS_PER_ITEM + ' 个标签');
+        return;
+    }
 
     // 计算总上传大小并检查带宽
     var totalUploadBytes = 0;
@@ -1710,7 +1944,8 @@ function confirmUpload() {
                     url: publicUrl,
                     uploader_id: uploaderId,
                     uploader_name: uploaderName,
-                    like_count: 0
+                    like_count: 0,
+                    tags: tags  // 添加标签
                 };
                 if (albumId) record.album_id = albumId;
                 return supabaseClient.from('images').insert([record]);
@@ -1737,27 +1972,31 @@ function confirmUpload() {
 
 
 // ======================================
-// 创建相册
+// 创建相册（v4 新版：只创建空相册，不上传封面）
 // ======================================
 function openAlbumCreateModal() {
     if (!checkUploadPermission()) return;
-    pendingAlbumCover = null;
-    document.getElementById('album-cover-file-list').innerHTML = '';
     document.getElementById('album-name-input').value = '';
+    document.getElementById('album-desc-input').value = '';
+    document.getElementById('album-tags-input').value = '';
     document.getElementById('album-confirm-btn').disabled = true;
-    document.getElementById('album-progress').classList.remove('show');
     document.getElementById('album-create-modal').classList.add('show');
-    document.getElementById('file-input-album-cover').value = '';
 }
 
 function closeAlbumCreateModal() {
     document.getElementById('album-create-modal').classList.remove('show');
-    document.getElementById('file-input-album-cover').value = '';
-    pendingAlbumCover = null;
+}
+
+function onAlbumFormInput() {
+    var name = document.getElementById('album-name-input').value.trim();
+    document.getElementById('album-confirm-btn').disabled = !name;
 }
 
 function confirmCreateAlbum() {
     var albumName = document.getElementById('album-name-input').value.trim();
+    var albumDesc = document.getElementById('album-desc-input').value.trim();
+    var tagsInput = document.getElementById('album-tags-input').value.trim();
+    
     if (!albumName) { showToast('请输入相册名称'); return; }
 
     var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
@@ -1765,59 +2004,61 @@ function confirmCreateAlbum() {
 
     var btn = document.getElementById('album-confirm-btn');
     btn.disabled = true;
-    var coverUrl = null;
 
-    function doCreate() {
-        var record = {
-            name: albumName,
-            cover_url: coverUrl,
-            uploader_id: uploaderId,
-            uploader_name: uploaderName
-        };
+    // 解析标签
+    var tags = parseTags(tagsInput);
+    if (tags.length > TAGS_CONFIG.MAX_TAGS_PER_ITEM) {
+        showToast('最多只能添加 ' + TAGS_CONFIG.MAX_TAGS_PER_ITEM + ' 个标签');
+        btn.disabled = false;
+        return;
+    }
 
-        supabaseClient.from('albums').insert([record]).then(function(result) {
-            if (result.error) {
-                if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
-                    showToast('请先在 Supabase 创建 albums 表');
-                } else {
-                    throw result.error;
-                }
+    var record = {
+        name: albumName,
+        description: albumDesc,
+        cover_url: null,  // 封面由第一张上传的图片自动设置
+        uploader_id: uploaderId,
+        uploader_name: uploaderName,
+        tags: tags
+    };
+
+    supabaseClient.from('albums').insert([record]).select().then(function(result) {
+        if (result.error) {
+            if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                showToast('请先在 Supabase 创建 albums 表');
             } else {
-                closeAlbumCreateModal();
-                showToast('相册「' + albumName + '」创建成功');
-                if (currentTab === 'albums') loadAlbums();
+                throw result.error;
             }
-        }).catch(function(err) {
-            console.error('Create album fail:', err);
-            showToast('创建失败: ' + (err.message || '未知错误'));
-        }).finally(function() {
-            btn.disabled = false;
-            document.getElementById('album-progress').classList.remove('show');
-        });
-    }
+        } else {
+            closeAlbumCreateModal();
+            showToast('相册「' + albumName + '」创建成功');
+            if (currentTab === 'albums') loadAlbums();
+            // 如果创建成功且有返回数据，自动打开相册详情页
+            if (result.data && result.data[0]) {
+                openAlbumDetail(result.data[0].id, result.data[0].name);
+            }
+        }
+    }).catch(function(err) {
+        console.error('Create album fail:', err);
+        showToast('创建失败: ' + (err.message || '未知错误'));
+    }).finally(function() {
+        btn.disabled = false;
+    });
+}
 
-    if (pendingAlbumCover) {
-        var progressEl = document.getElementById('album-progress');
-        var progressBar = document.getElementById('album-progress-bar');
-        progressEl.classList.add('show');
-        progressBar.style.width = '30%';
+// 解析标签输入（支持空格、逗号、分号分隔）
+function parseTags(input) {
+    if (!input) return [];
+    return input.split(/[,;，；\s]+/)
+        .map(function(t) { return t.trim(); })
+        .filter(function(t) { return t.length > 0 && t.length <= TAGS_CONFIG.MAX_TAG_LENGTH; })
+        .slice(0, TAGS_CONFIG.MAX_TAGS_PER_ITEM);
+}
 
-        compressImage(pendingAlbumCover, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
-            var fileName = 'album_cover_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + pendingAlbumCover.name;
-            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed);
-        }).then(function(uploadResult) {
-            if (uploadResult.error) throw uploadResult.error;
-            progressBar.style.width = '70%';
-            var fileName = uploadResult.data.path;
-            coverUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
-        }).catch(function(err) {
-            console.warn('Cover upload failed:', err);
-        }).finally(function() {
-            doCreate();
-        });
-    } else {
-        doCreate();
-    }
+// 格式化标签显示
+function formatTags(tags) {
+    if (!tags || tags.length === 0) return '';
+    return tags.map(function(t) { return '#' + t; }).join(' ');
 }
 
 
@@ -1863,15 +2104,29 @@ function renderAlbums(albums, container) {
             var card = document.createElement('div');
             card.className = 'album-card';
             card.onclick = function() { openAlbumDetail(album.id, album.name); };
+            
+            // 封面显示
             var coverHTML = album.cover_url
                 ? '<div class="album-cover"><img src="' + escapeAttr(album.cover_url) + '" alt="' + escapeAttr(album.name) + '" loading="lazy"></div>'
-                : '<div class="album-cover">&#128444;&#65039;</div>';
+                : '<div class="album-cover album-no-cover">&#128444;&#65039;<span>暂无封面</span></div>';
+            
             var uploaderName = album.uploader_name || DEFAULT_UPLOADER_NAME;
+            var tagsHtml = album.tags && album.tags.length > 0 
+                ? '<div class="album-tags">' + formatTags(album.tags) + '</div>' 
+                : '';
+            var descHtml = album.description 
+                ? '<div class="album-desc-preview">' + escapeHtml(album.description.substring(0, 50)) + (album.description.length > 50 ? '...' : '') + '</div>' 
+                : '';
+            
             card.innerHTML = coverHTML +
                 '<div class="album-info">' +
                     '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
-                    '<div class="album-meta">' + (album.image_count || 0) + ' 张图片</div>' +
-                    '<div class="album-uploader">by ' + escapeHtml(uploaderName) + '</div>' +
+                    descHtml +
+                    tagsHtml +
+                    '<div class="album-meta-row">' +
+                        '<span class="album-count">' + (album.image_count || 0) + ' 张</span>' +
+                        '<span class="album-uploader" onclick="event.stopPropagation(); showAuthorWorks(\'' + escapeAttr(uploaderName) + '\')">by ' + escapeHtml(uploaderName) + '</span>' +
+                    '</div>' +
                 '</div>';
             if (isAdmin) {
                 var delBtn = document.createElement('button');
@@ -1894,7 +2149,34 @@ function openAlbumDetail(albumId, albumName) {
     document.querySelectorAll('.tab').forEach(function(t) {
         t.classList.toggle('active', t.dataset.tab === 'albums');
     });
+    // 加载相册信息（包括描述）
+    loadAlbumInfo(albumId);
     loadAlbumDetail(albumId);
+}
+
+function loadAlbumInfo(albumId) {
+    supabaseClient.from('albums').select('*').eq('id', albumId).single()
+    .then(function(result) {
+        if (result.data) {
+            var album = result.data;
+            document.getElementById('detail-album-name').textContent = album.name;
+            var descEl = document.getElementById('detail-album-desc');
+            if (album.description) {
+                descEl.textContent = album.description;
+                descEl.style.display = 'block';
+            } else {
+                descEl.style.display = 'none';
+            }
+            // 显示标签
+            var tagsEl = document.getElementById('detail-album-tags');
+            if (album.tags && album.tags.length > 0) {
+                tagsEl.innerHTML = formatTags(album.tags);
+                tagsEl.style.display = 'block';
+            } else {
+                tagsEl.style.display = 'none';
+            }
+        }
+    });
 }
 
 function loadAlbumDetail(albumId) {
@@ -1983,6 +2265,461 @@ function deleteAlbum(albumId, albumName) {
         loadAlbums();
     }).catch(function(e) {
         showToast('删除失败: ' + e.message);
+    });
+}
+
+
+// ======================================
+// 相册内批量上传（v4 新版）
+// ======================================
+var albumUploadFiles = [];
+var currentUploadAlbumId = null;
+
+function openAlbumUploadModal(albumId) {
+    if (!checkUploadPermission()) return;
+    currentUploadAlbumId = albumId;
+    albumUploadFiles = [];
+    document.getElementById('album-upload-file-list').innerHTML = '';
+    document.getElementById('album-upload-tags').value = '';
+    document.getElementById('album-upload-confirm-btn').disabled = true;
+    document.getElementById('album-upload-progress').classList.remove('show');
+    document.getElementById('album-upload-modal').classList.add('show');
+    document.getElementById('file-input-album-upload').value = '';
+}
+
+function closeAlbumUploadModal() {
+    document.getElementById('album-upload-modal').classList.remove('show');
+    document.getElementById('file-input-album-upload').value = '';
+    albumUploadFiles = [];
+    currentUploadAlbumId = null;
+}
+
+function handleAlbumFileSelect(files) {
+    var filtered = [];
+    for (var i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image/') === 0) filtered.push(files[i]);
+    }
+    
+    albumUploadFiles = filtered;
+    var listEl = document.getElementById('album-upload-file-list');
+    if (albumUploadFiles.length > 0) {
+        var html = '';
+        for (var j = 0; j < albumUploadFiles.length; j++) {
+            html += '<div class="file-item">' + 
+                escapeHtml(albumUploadFiles[j].name) + 
+                ' (' + (albumUploadFiles[j].size / 1024).toFixed(1) + ' KB)' +
+            '</div>';
+        }
+        listEl.innerHTML = html;
+        document.getElementById('album-upload-confirm-btn').disabled = false;
+    } else {
+        listEl.innerHTML = '';
+        document.getElementById('album-upload-confirm-btn').disabled = true;
+    }
+}
+
+function confirmAlbumUpload() {
+    if (albumUploadFiles.length === 0 || !currentUploadAlbumId) return;
+
+    var tagsInput = document.getElementById('album-upload-tags').value.trim();
+    var tags = parseTags(tagsInput);
+    
+    if (tags.length > TAGS_CONFIG.MAX_TAGS_PER_ITEM) {
+        showToast('最多只能添加 ' + TAGS_CONFIG.MAX_TAGS_PER_ITEM + ' 个标签');
+        return;
+    }
+
+    var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+    var uploaderId = currentUser ? currentUser.id : null;
+
+    // 计算总上传大小并检查带宽
+    var totalUploadBytes = 0;
+    for (var i = 0; i < albumUploadFiles.length; i++) {
+        totalUploadBytes += albumUploadFiles[i].size;
+    }
+    var check = checkBandwidthLimit(totalUploadBytes);
+    if (!check.allowed) {
+        showToast('上传失败：今日上传额度不足，剩余 ' + formatBytes(check.remaining));
+        return;
+    }
+
+    var btn = document.getElementById('album-upload-confirm-btn');
+    btn.disabled = true;
+    var progressEl = document.getElementById('album-upload-progress');
+    var progressBar = document.getElementById('album-upload-progress-bar');
+    var progressText = document.getElementById('album-upload-progress-text');
+    progressEl.classList.add('show');
+
+    var success = 0;
+    var fail = 0;
+    var idx = 0;
+    var totalUploadedBytes = 0;
+
+    function uploadNext() {
+        if (idx >= albumUploadFiles.length) {
+            progressEl.classList.remove('show');
+            closeAlbumUploadModal();
+            if (fail === 0) {
+                showToast('成功上传 ' + success + ' 张图片到相册');
+            } else {
+                showToast('上传完成：' + success + ' 成功，' + fail + ' 失败');
+            }
+            // 刷新相册详情
+            loadAlbumDetail(currentUploadAlbumId);
+            // 刷新相册列表（封面可能已更新）
+            if (currentTab === 'albums') loadAlbums();
+            return;
+        }
+
+        var file = albumUploadFiles[idx];
+        progressText.textContent = '正在上传 ' + (idx + 1) + '/' + albumUploadFiles.length + ': ' + file.name;
+        
+        // 先压缩
+        compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
+
+            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
+                if (uploadResult.error) throw uploadResult.error;
+                var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+                var record = {
+                    url: publicUrl,
+                    uploader_id: uploaderId,
+                    uploader_name: uploaderName,
+                    album_id: currentUploadAlbumId,
+                    like_count: 0,
+                    tags: tags  // 所有图片使用相同的标签
+                };
+                return supabaseClient.from('images').insert([record]);
+            }).then(function(insertResult) {
+                if (insertResult && insertResult.error) throw insertResult.error;
+                success++;
+                totalUploadedBytes += compressed.size;
+            });
+        }).catch(function(err) {
+            console.error('Album upload fail:', err);
+            fail++;
+            var errorMsg = err && err.message ? err.message : '上传失败';
+            showToast(file.name + ': ' + errorMsg);
+        }).finally(function() {
+            idx++;
+            progressBar.style.width = (idx / albumUploadFiles.length * 100) + '%';
+            uploadNext();
+        });
+    }
+
+    uploadNext();
+}
+
+
+// ======================================
+// 搜索功能（v4 新版）
+// ======================================
+var currentSearchType = 'tag'; // 'tag' 或 'author'
+var currentSearchQuery = '';
+
+function initSearch() {
+    // 搜索类型切换
+    document.querySelectorAll('.search-type-tab').forEach(function(tab) {
+        tab.onclick = function() {
+            document.querySelectorAll('.search-type-tab').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            tab.classList.add('active');
+            currentSearchType = tab.dataset.searchType;
+            updateSearchPlaceholder();
+            updateSearchFilters();
+        };
+    });
+    
+    // 搜索输入框回车事件
+    var searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.onkeypress = function(e) {
+            if (e.key === 'Enter') performSearch();
+        };
+    }
+    
+    updateSearchPlaceholder();
+}
+
+function updateSearchPlaceholder() {
+    var input = document.getElementById('search-input');
+    if (!input) return;
+    
+    if (currentSearchType === 'tag') {
+        input.placeholder = '搜索标签，如：风景 人物';
+    } else {
+        input.placeholder = '搜索作者昵称';
+    }
+}
+
+function updateSearchFilters() {
+    var filters = document.getElementById('search-filters');
+    if (!filters) return;
+    
+    if (currentSearchType === 'tag') {
+        filters.style.display = 'flex';
+    } else {
+        filters.style.display = 'none';
+    }
+}
+
+function performSearch() {
+    var query = document.getElementById('search-input').value.trim();
+    if (!query) {
+        showToast('请输入搜索内容');
+        return;
+    }
+    
+    currentSearchQuery = query;
+    
+    if (currentSearchType === 'tag') {
+        searchByTags(query);
+    } else {
+        searchByAuthor(query);
+    }
+}
+
+function searchByTags(query) {
+    var tags = parseTags(query);
+    if (tags.length === 0) {
+        showToast('请输入有效的标签');
+        return;
+    }
+    
+    var searchImages = document.getElementById('search-images').checked;
+    var searchAlbums = document.getElementById('search-albums').checked;
+    
+    // 切换到搜索结果 Tab
+    switchToSearchTab();
+    
+    var imagesContainer = document.getElementById('search-images-results');
+    var albumsContainer = document.getElementById('search-albums-results');
+    var authorsContainer = document.getElementById('search-authors-results');
+    
+    imagesContainer.innerHTML = '<div class="loading">搜索中...</div>';
+    albumsContainer.innerHTML = '';
+    authorsContainer.innerHTML = '';
+    
+    var promises = [];
+    
+    if (searchImages) {
+        promises.push(
+            supabaseClient.from('images')
+                .select('*')
+                .overlaps('tags', tags)
+                .order('created_at', { ascending: false })
+                .limit(50)
+                .then(function(result) {
+                    if (result.data && result.data.length > 0) {
+                        imagesContainer.innerHTML = '<h4>&#128247; 图片</h4>';
+                        renderImages(result.data, imagesContainer, true);
+                    } else {
+                        imagesContainer.innerHTML = '<div class="empty-state">未找到相关图片</div>';
+                    }
+                })
+        );
+    } else {
+        imagesContainer.innerHTML = '';
+    }
+    
+    if (searchAlbums) {
+        promises.push(
+            supabaseClient.from('albums')
+                .select('*')
+                .overlaps('tags', tags)
+                .order('created_at', { ascending: false })
+                .limit(50)
+                .then(function(result) {
+                    if (result.data && result.data.length > 0) {
+                        albumsContainer.innerHTML = '<h4>&#128218; 相册</h4>';
+                        renderAlbums(result.data, albumsContainer);
+                    } else {
+                        albumsContainer.innerHTML = '<div class="empty-state">未找到相关相册</div>';
+                    }
+                })
+        );
+    } else {
+        albumsContainer.innerHTML = '';
+    }
+    
+    Promise.all(promises).catch(function(err) {
+        console.error('Search error:', err);
+        showToast('搜索失败: ' + err.message);
+    });
+}
+
+function searchByAuthor(query) {
+    if (!query) return;
+    
+    switchToSearchTab();
+    
+    var imagesContainer = document.getElementById('search-images-results');
+    var albumsContainer = document.getElementById('search-albums-results');
+    var authorsContainer = document.getElementById('search-authors-results');
+    
+    imagesContainer.innerHTML = '<div class="loading">搜索中...</div>';
+    albumsContainer.innerHTML = '';
+    authorsContainer.innerHTML = '';
+    
+    // 搜索该作者的所有作品
+    Promise.all([
+        supabaseClient.from('images')
+            .select('*')
+            .ilike('uploader_name', '%' + query + '%')
+            .order('created_at', { ascending: false })
+            .limit(50),
+        supabaseClient.from('albums')
+            .select('*')
+            .ilike('uploader_name', '%' + query + '%')
+            .order('created_at', { ascending: false })
+            .limit(50)
+    ]).then(function(results) {
+        var imagesResult = results[0];
+        var albumsResult = results[1];
+        
+        // 显示作者信息
+        var authors = {};
+        if (imagesResult.data) {
+            imagesResult.data.forEach(function(img) {
+                if (!authors[img.uploader_name]) {
+                    authors[img.uploader_name] = { name: img.uploader_name, images: 0, albums: 0 };
+                }
+                authors[img.uploader_name].images++;
+            });
+        }
+        if (albumsResult.data) {
+            albumsResult.data.forEach(function(album) {
+                if (!authors[album.uploader_name]) {
+                    authors[album.uploader_name] = { name: album.uploader_name, images: 0, albums: 0 };
+                }
+                authors[album.uploader_name].albums++;
+            });
+        }
+        
+        // 渲染作者列表
+        if (Object.keys(authors).length > 0) {
+            authorsContainer.innerHTML = '<h4>&#128100; 作者</h4>';
+            var authorsList = document.createElement('div');
+            authorsList.className = 'authors-grid';
+            
+            Object.values(authors).forEach(function(author) {
+                var card = document.createElement('div');
+                card.className = 'author-card';
+                card.onclick = function() { showAuthorWorks(author.name); };
+                card.innerHTML = 
+                    '<div class="author-avatar">&#128100;</div>' +
+                    '<div class="author-name">' + escapeHtml(author.name) + '</div>' +
+                    '<div class="author-stats">' + 
+                        author.images + ' 张图片 · ' + author.albums + ' 个相册' +
+                    '</div>';
+                authorsList.appendChild(card);
+            });
+            authorsContainer.appendChild(authorsList);
+        } else {
+            authorsContainer.innerHTML = '<div class="empty-state">未找到相关作者</div>';
+        }
+        
+        // 渲染图片
+        if (imagesResult.data && imagesResult.data.length > 0) {
+            imagesContainer.innerHTML = '<h4>&#128247; 图片</h4>';
+            renderImages(imagesResult.data, imagesContainer, true);
+        } else {
+            imagesContainer.innerHTML = '';
+        }
+        
+        // 渲染相册
+        if (albumsResult.data && albumsResult.data.length > 0) {
+            albumsContainer.innerHTML = '<h4>&#128218; 相册</h4>';
+            renderAlbums(albumsResult.data, albumsContainer);
+        } else {
+            albumsContainer.innerHTML = '';
+        }
+        
+    }).catch(function(err) {
+        console.error('Author search error:', err);
+        showToast('搜索失败: ' + err.message);
+    });
+}
+
+function switchToSearchTab() {
+    // 隐藏所有面板
+    document.getElementById('home-panel').style.display = 'none';
+    document.getElementById('albums-panel').style.display = 'none';
+    document.getElementById('ranking-panel').style.display = 'none';
+    document.getElementById('search-panel').style.display = 'block';
+    
+    // 更新 Tab 状态
+    document.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.remove('active');
+    });
+    var searchTab = document.getElementById('search-tab');
+    searchTab.style.display = 'inline-flex';
+    searchTab.classList.add('active');
+    
+    currentTab = 'search';
+}
+
+function clearSearch() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-images-results').innerHTML = '';
+    document.getElementById('search-albums-results').innerHTML = '';
+    document.getElementById('search-authors-results').innerHTML = '';
+    
+    // 返回首页
+    switchTab('home');
+    document.getElementById('search-tab').style.display = 'none';
+}
+
+// ======================================
+// 作者主页
+// ======================================
+function showAuthorWorks(authorName) {
+    if (!authorName) return;
+    
+    switchToSearchTab();
+    document.getElementById('search-results-title').textContent = authorName + ' 的作品';
+    
+    var imagesContainer = document.getElementById('search-images-results');
+    var albumsContainer = document.getElementById('search-albums-results');
+    var authorsContainer = document.getElementById('search-authors-results');
+    
+    imagesContainer.innerHTML = '<div class="loading">加载中...</div>';
+    albumsContainer.innerHTML = '';
+    authorsContainer.innerHTML = '';
+    
+    Promise.all([
+        supabaseClient.from('images')
+            .select('*')
+            .eq('uploader_name', authorName)
+            .order('created_at', { ascending: false })
+            .limit(100),
+        supabaseClient.from('albums')
+            .select('*')
+            .eq('uploader_name', authorName)
+            .order('created_at', { ascending: false })
+            .limit(100)
+    ]).then(function(results) {
+        var imagesResult = results[0];
+        var albumsResult = results[1];
+        
+        // 渲染图片
+        if (imagesResult.data && imagesResult.data.length > 0) {
+            imagesContainer.innerHTML = '<h4>&#128247; 图片 (' + imagesResult.data.length + ')</h4>';
+            renderImages(imagesResult.data, imagesContainer, true);
+        } else {
+            imagesContainer.innerHTML = '<div class="empty-state">该作者暂无图片</div>';
+        }
+        
+        // 渲染相册
+        if (albumsResult.data && albumsResult.data.length > 0) {
+            albumsContainer.innerHTML = '<h4>&#128218; 相册 (' + albumsResult.data.length + ')</h4>';
+            renderAlbums(albumsResult.data, albumsContainer);
+        }
+        
+    }).catch(function(err) {
+        console.error('Load author works error:', err);
+        showToast('加载失败: ' + err.message);
     });
 }
 
@@ -2576,6 +3313,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 设置大图键盘导航
     setupModalKeyboardNav();
+    
+    // 初始化搜索功能
+    initSearch();
+    
+    // 设置相册内上传拖拽
+    setupDragDrop('album-upload-drop', 'album-upload');
+    document.getElementById('file-input-album-upload').addEventListener('change', function(e) {
+        handleAlbumFileSelect(e.target.files);
+    });
+    document.getElementById('album-upload-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeAlbumUploadModal();
+    });
 
     loadImages();
 });
@@ -2622,13 +3371,14 @@ function setupDragDrop(dropId, type) {
 // ======================================
 function switchTab(tabName) {
     currentTab = tabName;
-    currentAlbumId = null;
+    if (tabName !== 'albums') currentAlbumId = null;
     document.querySelectorAll('.tab').forEach(function(t) {
         t.classList.toggle('active', t.dataset.tab === tabName);
     });
     document.getElementById('home-panel').style.display = tabName === 'home' ? 'block' : 'none';
     document.getElementById('albums-panel').style.display = tabName === 'albums' ? 'block' : 'none';
     document.getElementById('ranking-panel').style.display = tabName === 'ranking' ? 'block' : 'none';
+    document.getElementById('search-panel').style.display = tabName === 'search' ? 'block' : 'none';
     if (tabName === 'home') loadImages();
     else if (tabName === 'albums') loadAlbums();
     else if (tabName === 'ranking') loadRanking();
