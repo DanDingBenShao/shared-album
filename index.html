@@ -878,7 +878,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 // 配置
 // ======================================
 var SUPABASE_URL = "https://atrxuinvvsdnphoexyfc.supabase.co";
-var SUPABASE_ANON_KEY = "sb_publishable_UYNgnIAelEZCCklD9DbOWQ__Ij3HNsz";
+var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cnh1aW52dnNkbnBob2V4eWZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjIxNzAsImV4cCI6MjA5MDQzODE3MH0.k0h8PwdJh7s709B4k7g9egFrBtTXytexsrQbyj68sPg";
 var ADMIN_PASSWORD = "8AWOhdzZtj1YBmFe";
 var STORAGE_BUCKET = "images";
 var DEFAULT_UPLOADER_NAME = "匿名用户";
@@ -1838,10 +1838,19 @@ function updateStorageSizeDisplay(bytes) {
 
 
 // ======================================
-// 上传图片
+// 上传图片 - 重构版（更健壮的错误处理）
 // ======================================
 var pendingFiles = [];
 var pendingAlbumCover = null;
+
+// 调试模式
+var UPLOAD_DEBUG = true;
+
+function logUpload(msg, data) {
+    if (UPLOAD_DEBUG) {
+        console.log('[Upload]', msg, data || '');
+    }
+}
 
 function checkUploadPermission() {
     if (isAdmin) return true;
@@ -1916,6 +1925,43 @@ function handleFileSelect(files, type) {
     }
 }
 
+// 使用 fetch API 直接上传（绕过 Supabase JS 库的潜在问题）
+function uploadWithFetch(file, fileName) {
+    return new Promise(function(resolve, reject) {
+        var url = SUPABASE_URL + '/storage/v1/object/' + STORAGE_BUCKET + '/' + encodeURIComponent(fileName);
+        logUpload('Upload URL:', url);
+        
+        var headers = {
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Content-Type': file.type || 'image/jpeg'
+        };
+        logUpload('Headers:', headers);
+        
+        fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: file
+        }).then(function(response) {
+            logUpload('Response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    logUpload('Error response:', text);
+                    throw new Error('HTTP ' + response.status + ': ' + text);
+                });
+            }
+            return response.json();
+        }).then(function(data) {
+            logUpload('Upload success:', data);
+            // 构建 public URL
+            var publicUrl = SUPABASE_URL + '/storage/v1/object/public/' + STORAGE_BUCKET + '/' + encodeURIComponent(fileName);
+            resolve({ publicUrl: publicUrl, data: data });
+        }).catch(function(err) {
+            logUpload('Upload error:', err.message);
+            reject(err);
+        });
+    });
+}
+
 function confirmUpload() {
     if (pendingFiles.length === 0) return;
 
@@ -1964,6 +2010,8 @@ function confirmUpload() {
         }
 
         var file = pendingFiles[idx];
+        logUpload('Processing file:', file.name, 'Size:', file.size);
+        
         // 先压缩
         compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
             var sizeDiff = file.size - compressed.size;
@@ -1971,30 +2019,35 @@ function confirmUpload() {
                 console.log('压缩 ' + file.name + ': ' + (file.size/1024).toFixed(1) + 'KB -> ' + (compressed.size/1024).toFixed(1) + 'KB (节省' + (sizeDiff/file.size*100).toFixed(0) + '%)');
             }
             var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
+            logUpload('Uploading as:', fileName);
 
-            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
-                if (uploadResult.error) throw uploadResult.error;
-                var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+            // 使用 fetch 直接上传
+            return uploadWithFetch(compressed, fileName).then(function(uploadResult) {
+                logUpload('Fetch upload success, publicUrl:', uploadResult.publicUrl);
+                
                 var record = {
-                    url: publicUrl,
+                    url: uploadResult.publicUrl,
                     uploader_id: uploaderId,
                     uploader_name: uploaderName,
                     like_count: 0,
-                    tags: tags  // 添加标签
+                    tags: tags
                 };
                 if (albumId) record.album_id = albumId;
+                
+                logUpload('Inserting to database:', record);
                 return supabaseClient.from('images').insert([record]);
             }).then(function(insertResult) {
                 if (insertResult && insertResult.error) throw insertResult.error;
                 success++;
                 totalUploadedBytes += compressed.size;
+                logUpload('Database insert success');
             });
         }).catch(function(err) {
             console.error('Upload fail:', err);
             fail++;
             // 显示具体错误信息
             var errorMsg = err && err.message ? err.message : '上传失败';
-            showToast(errorMsg);
+            showToast('上传失败: ' + errorMsg);
         }).finally(function() {
             idx++;
             progressBar.style.width = (idx / pendingFiles.length * 100) + '%';
