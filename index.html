@@ -791,44 +791,67 @@ function showBandwidthLimitExceeded() {
 // ======================================
 // 图片压缩（Canvas 方式，节省带宽）
 // ======================================
+
+// 压缩配置
+var COMPRESS_MAX_FILE_SIZE = 10 * 1024 * 1024;  // 10MB：超过此大小拒绝上传
+var COMPRESS_TARGET_SIZE = 2 * 1024 * 1024;     // 2MB：压缩目标大小
+var COMPRESS_MAX_PIXELS = 1200 * 2400;          // 最大像素数（宽×高）
+
 function compressImage(file, maxWidth, quality) {
     return new Promise(function(resolve, reject) {
+        // 1. 文件大小预检查
+        if (file.size > COMPRESS_MAX_FILE_SIZE) {
+            reject(new Error('图片过大（' + (file.size / 1024 / 1024).toFixed(1) + 'MB），请压缩后上传（最大10MB）'));
+            return;
+        }
+        
         var reader = new FileReader();
         reader.onload = function(e) {
             var img = new Image();
+            var loadTimeout;
+            
             img.onload = function() {
-                // 竖屏图片需要特殊处理：限制最大高度，避免内存问题
-                var maxHeight = maxWidth * 2; // 竖屏图片最大高度为宽度的2倍
+                clearTimeout(loadTimeout);
                 
-                if (img.width <= maxWidth && img.height <= maxHeight && file.size < 500 * 1024) {
-                    // 不需要压缩
+                // 2. 计算是否需要压缩
+                var maxHeight = maxWidth * 2; // 竖屏图片最大高度为宽度的2倍
+                var pixelCount = img.width * img.height;
+                
+                // 如果图片很小且文件不大，直接返回原文件
+                if (img.width <= maxWidth && img.height <= maxHeight && 
+                    file.size < 500 * 1024 && pixelCount <= COMPRESS_MAX_PIXELS) {
                     resolve(file);
                     return;
                 }
                 
-                var canvas = document.createElement('canvas');
+                // 3. 智能缩放计算
                 var w = img.width;
                 var h = img.height;
+                var scale = 1;
                 
-                // 根据宽高比决定缩放策略
+                // 根据像素数限制计算缩放比例
+                if (pixelCount > COMPRESS_MAX_PIXELS) {
+                    scale = Math.sqrt(COMPRESS_MAX_PIXELS / pixelCount);
+                }
+                
+                // 根据宽高限制调整
                 if (w > h) {
-                    // 横屏图片：按宽度限制
-                    if (w > maxWidth) {
-                        h = Math.round(h * maxWidth / w);
-                        w = maxWidth;
+                    // 横屏：优先限制宽度
+                    if (w * scale > maxWidth) {
+                        scale = maxWidth / w;
                     }
                 } else {
-                    // 竖屏图片：按高度限制
-                    if (h > maxHeight) {
-                        w = Math.round(w * maxHeight / h);
-                        h = maxHeight;
-                    } else if (w > maxWidth) {
-                        // 如果宽度也超过，按宽度缩放
-                        h = Math.round(h * maxWidth / w);
-                        w = maxWidth;
+                    // 竖屏：优先限制高度
+                    if (h * scale > maxHeight) {
+                        scale = maxHeight / h;
                     }
                 }
                 
+                w = Math.round(w * scale);
+                h = Math.round(h * scale);
+                
+                // 4. Canvas 压缩
+                var canvas = document.createElement('canvas');
                 canvas.width = w;
                 canvas.height = h;
                 var ctx = canvas.getContext('2d');
@@ -838,34 +861,66 @@ function compressImage(file, maxWidth, quality) {
                 ctx.fillRect(0, 0, w, h);
                 ctx.drawImage(img, 0, 0, w, h);
                 
-                // 确定输出格式
+                // 5. 确定输出格式
                 var outputType = file.type || 'image/jpeg';
-                // 如果是 PNG 但文件很大，转为 JPEG 以获得更好压缩
-                if (outputType === 'image/png' && file.size > 2 * 1024 * 1024) {
+                // PNG 大图强制转 JPEG
+                if (outputType === 'image/png' && (file.size > 2 * 1024 * 1024 || pixelCount > 2000000)) {
                     outputType = 'image/jpeg';
                 }
                 
-                canvas.toBlob(function(blob) {
-                    if (blob && blob.size > 0) {
-                        var compressed = new File([blob], file.name, { type: blob.type || outputType });
+                // 6. 尝试压缩，如果结果仍太大则降低质量重试
+                function tryCompress(currentQuality, attempt) {
+                    canvas.toBlob(function(blob) {
+                        if (!blob || blob.size === 0) {
+                            console.warn('Canvas toBlob failed for', file.name);
+                            resolve(file); // 回退到原文件
+                            return;
+                        }
+                        
+                        // 如果压缩后仍大于目标大小且质量还可以降低，重试
+                        if (blob.size > COMPRESS_TARGET_SIZE && currentQuality > 0.5 && attempt < 3) {
+                            console.log('压缩后仍较大 (' + (blob.size/1024).toFixed(1) + 'KB)，降低质量重试...');
+                            tryCompress(currentQuality - 0.15, attempt + 1);
+                            return;
+                        }
+                        
+                        var compressed = new File([blob], file.name, { 
+                            type: blob.type || outputType,
+                            lastModified: Date.now()
+                        });
+                        
+                        console.log('压缩 ' + file.name + ': ' + 
+                            (file.size/1024).toFixed(1) + 'KB → ' + 
+                            (compressed.size/1024).toFixed(1) + 'KB (' + 
+                            ((1 - compressed.size/file.size) * 100).toFixed(0) + '%) ' +
+                            '尺寸: ' + w + '×' + h);
+                        
                         resolve(compressed);
-                    } else {
-                        // Canvas toBlob 失败，回退到原文件
-                        console.warn('Canvas toBlob failed for', file.name, '- using original');
-                        resolve(file);
-                    }
-                }, outputType, quality);
+                    }, outputType, currentQuality);
+                }
+                
+                tryCompress(quality, 1);
             };
+            
             img.onerror = function(err) { 
+                clearTimeout(loadTimeout);
                 console.error('Image load error:', err);
-                resolve(file); 
+                reject(new Error('图片加载失败，可能格式不支持'));
             };
+            
+            // 设置超时，防止超大图片卡死
+            loadTimeout = setTimeout(function() {
+                reject(new Error('图片处理超时，请尝试更小的图片'));
+            }, 30000); // 30秒超时
+            
             img.src = e.target.result;
         };
+        
         reader.onerror = function(err) { 
             console.error('FileReader error:', err);
-            resolve(file); 
+            reject(new Error('读取文件失败'));
         };
+        
         reader.readAsDataURL(file);
     });
 }
@@ -1667,6 +1722,9 @@ function confirmUpload() {
         }).catch(function(err) {
             console.error('Upload fail:', err);
             fail++;
+            // 显示具体错误信息
+            var errorMsg = err && err.message ? err.message : '上传失败';
+            showToast(errorMsg);
         }).finally(function() {
             idx++;
             progressBar.style.width = (idx / pendingFiles.length * 100) + '%';
