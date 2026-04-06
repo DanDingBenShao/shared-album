@@ -1033,14 +1033,173 @@ function showBandwidthLimitExceeded() {
 
 
 // ======================================
-// 图片压缩（Canvas 方式，节省带宽）
+// 图片压缩 v2 - 更可靠的压缩方式
 // ======================================
 
 // 压缩配置
 var COMPRESS_MAX_FILE_SIZE = 10 * 1024 * 1024;  // 10MB：超过此大小拒绝上传
 var COMPRESS_TARGET_SIZE = 2 * 1024 * 1024;     // 2MB：压缩目标大小
-var COMPRESS_MAX_PIXELS = 1200 * 2400;          // 最大像素数（宽×高）
+var COMPRESS_MAX_WIDTH = 1920;                  // 最大宽度
+var COMPRESS_MAX_HEIGHT = 1920;                 // 最大高度
+var COMPRESS_QUALITY = 0.85;                    // 默认压缩质量
 
+/**
+ * 创建图片对象并加载 - 使用 ObjectURL 代替 DataURL 节省内存
+ */
+function loadImage(file) {
+    return new Promise(function(resolve, reject) {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        var timeout;
+        
+        img.onload = function() {
+            clearTimeout(timeout);
+            URL.revokeObjectURL(url); // 立即释放内存
+            resolve(img);
+        };
+        
+        img.onerror = function() {
+            clearTimeout(timeout);
+            URL.revokeObjectURL(url);
+            reject(new Error('图片加载失败'));
+        };
+        
+        timeout = setTimeout(function() {
+            URL.revokeObjectURL(url);
+            reject(new Error('图片加载超时'));
+        }, 15000);
+        
+        img.src = url;
+    });
+}
+
+/**
+ * 读取图片 EXIF 方向信息
+ */
+function getImageOrientation(file) {
+    return new Promise(function(resolve) {
+        // 简单的 EXIF 读取，只处理方向
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var view = new DataView(e.target.result);
+            var length = view.byteLength;
+            var orientation = 1;
+            
+            if (view.getUint16(0, false) !== 0xFFD8) {
+                resolve(orientation);
+                return;
+            }
+            
+            var offset = 2;
+            while (offset < length) {
+                var marker = view.getUint16(offset, false);
+                offset += 2;
+                
+                if (marker === 0xFFE1) { // EXIF marker
+                    offset += 2; // skip length
+                    if (view.getUint32(offset, false) !== 0x45786966) {
+                        resolve(orientation);
+                        return;
+                    }
+                    offset += 6;
+                    
+                    var little = view.getUint16(offset, false) === 0x4949;
+                    offset += view.getUint32(offset + 4, little);
+                    var tags = view.getUint16(offset, little);
+                    offset += 2;
+                    
+                    for (var i = 0; i < tags; i++) {
+                        if (view.getUint16(offset + i * 12, little) === 0x0112) {
+                            orientation = view.getUint16(offset + i * 12 + 8, little);
+                            resolve(orientation);
+                            return;
+                        }
+                    }
+                } else if ((marker & 0xFF00) !== 0xFF00) {
+                    break;
+                } else {
+                    offset += view.getUint16(offset, false);
+                }
+            }
+            resolve(orientation);
+        };
+        reader.onerror = function() { resolve(1); };
+        reader.readAsArrayBuffer(file.slice(0, 64 * 1024)); // 只读前 64KB
+    });
+}
+
+/**
+ * 根据方向调整 canvas 变换
+ */
+function applyOrientation(ctx, width, height, orientation) {
+    switch (orientation) {
+        case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
+        case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
+        case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
+        case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+        case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
+        case 7: ctx.transform(0, -1, -1, 0, height, width); break;
+        case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
+    }
+}
+
+/**
+ * 计算压缩后的尺寸
+ */
+function calculateDimensions(imgWidth, imgHeight, maxW, maxH) {
+    var w = imgWidth;
+    var h = imgHeight;
+    
+    // 如果图片已经在限制范围内，不缩放
+    if (w <= maxW && h <= maxH) {
+        return { width: w, height: h };
+    }
+    
+    // 计算缩放比例，保持宽高比
+    var scale = Math.min(maxW / w, maxH / h, 1);
+    
+    return {
+        width: Math.round(w * scale),
+        height: Math.round(h * scale)
+    };
+}
+
+/**
+ * 将 canvas 转为 Blob - 使用更可靠的方式
+ */
+function canvasToBlob(canvas, type, quality) {
+    return new Promise(function(resolve, reject) {
+        // 方法1: 使用 toBlob (现代浏览器)
+        if (canvas.toBlob) {
+            canvas.toBlob(function(blob) {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('toBlob 返回 null'));
+                }
+            }, type, quality);
+        } else {
+            // 方法2: 使用 toDataURL 降级
+            try {
+                var dataURL = canvas.toDataURL(type, quality);
+                var byteString = atob(dataURL.split(',')[1]);
+                var mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+                var ab = new ArrayBuffer(byteString.length);
+                var ia = new Uint8Array(ab);
+                for (var i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                resolve(new Blob([ab], { type: mimeString }));
+            } catch (e) {
+                reject(e);
+            }
+        }
+    });
+}
+
+/**
+ * 主压缩函数 - v2 版本
+ */
 function compressImage(file, maxWidth, quality) {
     return new Promise(function(resolve, reject) {
         // 1. 文件大小预检查
@@ -1049,87 +1208,100 @@ function compressImage(file, maxWidth, quality) {
             return;
         }
         
-        var reader = new FileReader();
-        reader.onload = function(e) {
+        // 2. 小文件直接返回
+        if (file.size < 500 * 1024) {
             var img = new Image();
-            var loadTimeout;
-            
             img.onload = function() {
-                clearTimeout(loadTimeout);
-                
-                // 2. 计算是否需要压缩
-                var maxHeight = maxWidth * 2; // 竖屏图片最大高度为宽度的2倍
-                var pixelCount = img.width * img.height;
-                
-                // 如果图片很小且文件不大，直接返回原文件
-                if (img.width <= maxWidth && img.height <= maxHeight && 
-                    file.size < 500 * 1024 && pixelCount <= COMPRESS_MAX_PIXELS) {
+                if (img.width <= COMPRESS_MAX_WIDTH && img.height <= COMPRESS_MAX_HEIGHT) {
+                    console.log('图片较小且尺寸合适，跳过压缩:', file.name);
                     resolve(file);
-                    return;
-                }
-                
-                // 3. 智能缩放计算
-                var w = img.width;
-                var h = img.height;
-                var scale = 1;
-                
-                // 根据像素数限制计算缩放比例
-                if (pixelCount > COMPRESS_MAX_PIXELS) {
-                    scale = Math.sqrt(COMPRESS_MAX_PIXELS / pixelCount);
-                }
-                
-                // 根据宽高限制调整
-                if (w > h) {
-                    // 横屏：优先限制宽度
-                    if (w * scale > maxWidth) {
-                        scale = maxWidth / w;
-                    }
                 } else {
-                    // 竖屏：优先限制高度
-                    if (h * scale > maxHeight) {
-                        scale = maxHeight / h;
-                    }
+                    // 文件小但尺寸大，还是需要压缩
+                    doCompress();
                 }
+            };
+            img.onerror = function() { doCompress(); };
+            img.src = URL.createObjectURL(file);
+            return;
+        }
+        
+        doCompress();
+        
+        function doCompress() {
+            Promise.all([
+                loadImage(file),
+                getImageOrientation(file)
+            ]).then(function(results) {
+                var img = results[0];
+                var orientation = results[1];
                 
-                w = Math.round(w * scale);
-                h = Math.round(h * scale);
+                // 计算目标尺寸
+                var dims = calculateDimensions(
+                    img.width, 
+                    img.height, 
+                    maxWidth || COMPRESS_MAX_WIDTH,
+                    COMPRESS_MAX_HEIGHT
+                );
                 
-                // 4. Canvas 压缩
+                // 创建 canvas
                 var canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
                 var ctx = canvas.getContext('2d');
                 
-                // 填充白色背景（避免透明 PNG 变成黑色）
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, w, h);
-                ctx.drawImage(img, 0, 0, w, h);
-                
-                // 5. 确定输出格式
-                var outputType = file.type || 'image/jpeg';
-                // PNG 大图强制转 JPEG
-                if (outputType === 'image/png' && (file.size > 2 * 1024 * 1024 || pixelCount > 2000000)) {
-                    outputType = 'image/jpeg';
+                // 处理旋转方向
+                if (orientation >= 5 && orientation <= 8) {
+                    canvas.width = dims.height;
+                    canvas.height = dims.width;
+                } else {
+                    canvas.width = dims.width;
+                    canvas.height = dims.height;
                 }
                 
-                // 6. 尝试压缩，如果结果仍太大则降低质量重试
-                function tryCompress(currentQuality, attempt) {
-                    canvas.toBlob(function(blob) {
+                // 填充白色背景
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 应用方向变换
+                ctx.save();
+                applyOrientation(ctx, canvas.width, canvas.height, orientation);
+                
+                // 绘制图片
+                ctx.drawImage(img, 0, 0, dims.width, dims.height);
+                ctx.restore();
+                
+                // 确定输出格式
+                var outputType = 'image/jpeg'; // 默认 JPEG
+                if (file.type === 'image/png' && file.size < 2 * 1024 * 1024) {
+                    // 小 PNG 保持原格式
+                    outputType = 'image/png';
+                }
+                
+                // 压缩质量
+                var targetQuality = quality || COMPRESS_QUALITY;
+                
+                // 尝试压缩
+                tryCompress(canvas, outputType, targetQuality, 0);
+                
+                function tryCompress(cvs, type, q, attempt) {
+                    canvasToBlob(cvs, type, q).then(function(blob) {
                         if (!blob || blob.size === 0) {
-                            console.warn('Canvas toBlob failed for', file.name);
-                            resolve(file); // 回退到原文件
+                            console.warn('压缩失败，使用原文件:', file.name);
+                            resolve(file);
                             return;
                         }
                         
-                        // 如果压缩后仍大于目标大小且质量还可以降低，重试
-                        if (blob.size > COMPRESS_TARGET_SIZE && currentQuality > 0.5 && attempt < 3) {
+                        // 如果压缩后仍太大且还能降低质量
+                        if (blob.size > COMPRESS_TARGET_SIZE && q > 0.5 && attempt < 3) {
                             console.log('压缩后仍较大 (' + (blob.size/1024).toFixed(1) + 'KB)，降低质量重试...');
-                            tryCompress(currentQuality - 0.15, attempt + 1);
+                            tryCompress(cvs, type, q - 0.1, attempt + 1);
                             return;
                         }
                         
-                        var compressed = new File([blob], file.name, { 
-                            type: blob.type || outputType,
+                        // 创建新文件
+                        var ext = type === 'image/png' ? '.png' : '.jpg';
+                        var newName = file.name.replace(/\.[^/.]+$/, '') + ext;
+                        
+                        var compressed = new File([blob], newName, { 
+                            type: type,
                             lastModified: Date.now()
                         });
                         
@@ -1137,36 +1309,27 @@ function compressImage(file, maxWidth, quality) {
                             (file.size/1024).toFixed(1) + 'KB → ' + 
                             (compressed.size/1024).toFixed(1) + 'KB (' + 
                             ((1 - compressed.size/file.size) * 100).toFixed(0) + '%) ' +
-                            '尺寸: ' + w + '×' + h);
+                            '尺寸: ' + canvas.width + '×' + canvas.height);
                         
                         resolve(compressed);
-                    }, outputType, currentQuality);
+                    }).catch(function(err) {
+                        console.error('Canvas 转换失败:', err);
+                        resolve(file); // 失败时使用原文件
+                    });
                 }
                 
-                tryCompress(quality, 1);
-            };
-            
-            img.onerror = function(err) { 
-                clearTimeout(loadTimeout);
-                console.error('Image load error:', err);
-                reject(new Error('图片加载失败，可能格式不支持'));
-            };
-            
-            // 设置超时，防止超大图片卡死
-            loadTimeout = setTimeout(function() {
-                reject(new Error('图片处理超时，请尝试更小的图片'));
-            }, 30000); // 30秒超时
-            
-            img.src = e.target.result;
-        };
-        
-        reader.onerror = function(err) { 
-            console.error('FileReader error:', err);
-            reject(new Error('读取文件失败'));
-        };
-        
-        reader.readAsDataURL(file);
+            }).catch(function(err) {
+                console.error('图片处理失败:', err);
+                // 出错时返回原文件，让上传继续
+                resolve(file);
+            });
+        }
     });
+}
+
+// 导出
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { compressImage: compressImage };
 }
 
 
@@ -1375,13 +1538,16 @@ function doLogin() {
     var pwd = document.getElementById('login-pwd').value;
     if (!id || !pwd) { showToast('请输入ID和密码'); return; }
 
-    // 先检查黑名单
+    // 先检查黑名单（表不存在时跳过，不阻断登录）
     supabaseClient.from('blacklist').select('*').eq('user_id', id)
     .then(function(blResult) {
         if (blResult.data && blResult.data.length > 0) {
             showToast('账号已被封禁，无法登录');
             return false;
         }
+        return supabaseClient.from('users').select('*').eq('id', id).eq('password_hash', simpleHash(pwd));
+    }).catch(function() {
+        // blacklist 表不存在，跳过黑名单检查，继续登录流程
         return supabaseClient.from('users').select('*').eq('id', id).eq('password_hash', simpleHash(pwd));
     }).then(function(r) {
         if (r === false) return; // 黑名单拦截
@@ -2018,7 +2184,10 @@ function confirmUpload() {
             if (sizeDiff > 0) {
                 console.log('压缩 ' + file.name + ': ' + (file.size/1024).toFixed(1) + 'KB -> ' + (compressed.size/1024).toFixed(1) + 'KB (节省' + (sizeDiff/file.size*100).toFixed(0) + '%)');
             }
-            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
+            // 生成安全的文件名（去除中文和特殊字符）
+            var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_');
+            if (safeName.length > 50) safeName = safeName.substr(-50); // 限制长度
+            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + safeName;
             logUpload('Uploading as:', fileName);
 
             // 使用 fetch 直接上传
@@ -2029,9 +2198,12 @@ function confirmUpload() {
                     url: uploadResult.publicUrl,
                     uploader_id: uploaderId,
                     uploader_name: uploaderName,
-                    like_count: 0,
-                    tags: tags
+                    like_count: 0
                 };
+                // 只添加非空标签，避免空数组问题
+                if (tags && tags.length > 0) {
+                    record.tags = tags;
+                }
                 if (albumId) record.album_id = albumId;
                 
                 logUpload('Inserting to database:', record);
@@ -2103,28 +2275,44 @@ function confirmCreateAlbum() {
 
     var record = {
         name: albumName,
-        description: albumDesc,
         cover_url: null,  // 封面由第一张上传的图片自动设置
         uploader_id: uploaderId,
-        uploader_name: uploaderName,
-        tags: tags
+        uploader_name: uploaderName
     };
+    // 可选字段：只有列存在时才添加（兼容未执行 v4 迁移的数据库）
+    if (albumDesc) record.description = albumDesc;
+    if (tags.length > 0) record.tags = tags;
 
-    supabaseClient.from('albums').insert([record]).select().then(function(result) {
-        if (result.error) {
-            if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
-                showToast('请先在 Supabase 创建 albums 表');
-            } else {
-                throw result.error;
+    // 检测并去掉不存在的列，然后重试
+    function tryInsert(rec, retryCount) {
+        return supabaseClient.from('albums').insert([rec]).select().then(function(result) {
+            if (result.error) {
+                if (result.error.code === 'PGRST204' && result.error.message && result.error.message.indexOf("column") !== -1 && retryCount < 3) {
+                    var missingCol = result.error.message.match(/'(\w+)'/);
+                    if (missingCol && rec.hasOwnProperty(missingCol[1])) {
+                        var reduced = Object.assign({}, rec);
+                        delete reduced[missingCol[1]];
+                        return tryInsert(reduced, retryCount + 1);
+                    }
+                }
+                if (result.error.message && (result.error.message.indexOf('does not exist') !== -1 || result.error.code === '42P01')) {
+                    showToast('请先在 Supabase 创建 albums 表');
+                } else {
+                    throw result.error;
+                }
+                return null;
             }
-        } else {
-            closeAlbumCreateModal();
-            showToast('相册「' + albumName + '」创建成功');
-            if (currentTab === 'albums') loadAlbums();
-            // 如果创建成功且有返回数据，自动打开相册详情页
-            if (result.data && result.data[0]) {
-                openAlbumDetail(result.data[0].id, result.data[0].name);
-            }
+            return result;
+        });
+    }
+
+    tryInsert(record, 0).then(function(result) {
+        if (!result) return;
+        closeAlbumCreateModal();
+        showToast('相册「' + albumName + '」创建成功');
+        if (currentTab === 'albums') loadAlbums();
+        if (result.data && result.data[0]) {
+            openAlbumDetail(result.data[0].id, result.data[0].name);
         }
     }).catch(function(err) {
         console.error('Create album fail:', err);
@@ -2464,7 +2652,10 @@ function confirmAlbumUpload() {
         
         // 先压缩
         compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
-            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + file.name;
+            // 生成安全的文件名（去除中文和特殊字符）
+            var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_');
+            if (safeName.length > 50) safeName = safeName.substr(-50);
+            var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + safeName;
 
             return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
                 if (uploadResult.error) throw uploadResult.error;
@@ -2474,9 +2665,12 @@ function confirmAlbumUpload() {
                     uploader_id: uploaderId,
                     uploader_name: uploaderName,
                     album_id: currentUploadAlbumId,
-                    like_count: 0,
-                    tags: tags  // 所有图片使用相同的标签
+                    like_count: 0
                 };
+                // 只添加非空标签，避免空数组问题
+                if (tags && tags.length > 0) {
+                    record.tags = tags;
+                }
                 return supabaseClient.from('images').insert([record]);
             }).then(function(insertResult) {
                 if (insertResult && insertResult.error) throw insertResult.error;
