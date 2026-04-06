@@ -569,6 +569,30 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             background: #d32f2f;
         }
 
+        /* ===== 密码显示/隐藏按钮 ===== */
+        .pwd-toggle-btn {
+            position: absolute; right: 4px; top: 28px;
+            background: none; border: none; cursor: pointer;
+            font-size: 16px; padding: 4px 8px;
+            opacity: 0.5; transition: opacity 0.2s;
+        }
+        .pwd-toggle-btn:hover { opacity: 0.8; }
+
+        /* ===== 更换封面按钮 ===== */
+        .btn-change-cover {
+            width: 100%; padding: 10px;
+            background: #607D8B; color: white;
+            border: none; border-radius: 8px;
+            font-size: 13px; cursor: pointer;
+            transition: all 0.2s; margin-top: 8px;
+        }
+        .btn-change-cover:hover { background: #546E7A; }
+
+        /* ===== 大图加载动画 ===== */
+        .image-modal img {
+            transition: opacity 0.3s ease;
+        }
+
     </style>
 </head>
 <body>
@@ -696,6 +720,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <button class="btn-upload-to-album" onclick="openAlbumUploadModal(currentAlbumId)">
                     &#128247; 上传图片到相册
                 </button>
+                <button class="btn-change-cover" id="btn-change-cover" onclick="openChangeCoverModal()" style="display:none;">
+                    &#128247; 更换封面
+                </button>
             </div>
             <div class="images-grid" id="album-detail-images"></div>
         </div>
@@ -736,6 +763,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <span class="like-icon">&#10084;</span>
                 <span class="like-count">0</span>
             </button>
+            <button class="modal-action-btn download-btn" id="modal-download-btn">
+                <span>&#11015;</span>
+                <span>下载</span>
+            </button>
             <button class="modal-action-btn delete-btn" id="modal-delete-btn" style="display:none;">
                 <span>&#128465;</span>
                 <span>删除</span>
@@ -759,9 +790,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                     <label>用户 ID</label>
                     <input type="text" id="login-id" placeholder="输入你的ID" maxlength="20">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="position:relative;">
                     <label>密码</label>
                     <input type="password" id="login-pwd" placeholder="输入密码" maxlength="32">
+                    <button type="button" class="pwd-toggle-btn" onclick="togglePwdVisibility('login-pwd', this)">&#128065;</button>
                 </div>
                 <div class="modal-actions">
                     <button class="btn-cancel" onclick="closeAuthModal()">取消</button>
@@ -777,9 +809,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                     <label>昵称（显示在上传的图片旁）</label>
                     <input type="text" id="reg-nickname" placeholder="你的昵称" maxlength="20">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="position:relative;">
                     <label>密码</label>
                     <input type="password" id="reg-pwd" placeholder="设置密码" maxlength="32">
+                    <button type="button" class="pwd-toggle-btn" onclick="togglePwdVisibility('reg-pwd', this)">&#128065;</button>
                 </div>
                 <div class="auth-hint">注册后需要管理员将你加入白名单才能上传作品</div>
                 <div class="modal-actions">
@@ -804,6 +837,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <label>标签（最多3个，用空格或逗号分隔）</label>
                 <input type="text" id="upload-tags-input" placeholder="例如：风景 旅行 2024" maxlength="50">
                 <div class="input-hint">标签用于搜索，如：#风景 #旅行</div>
+            </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="upload-anonymous"> 匿名上传（不显示上传者昵称）
+                </label>
             </div>
             <div class="upload-drop" id="upload-drop" onclick="document.getElementById('file-input-image').click()">
                 <div class="icon">&#128228;</div>
@@ -850,6 +888,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <label>标签（最多3个，用空格或逗号分隔）</label>
                 <input type="text" id="album-tags-input" placeholder="例如：风景 旅行 2024" maxlength="50">
             </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="album-create-anonymous"> 匿名上传（不显示上传者昵称）
+                </label>
+            </div>
             <div class="progress-bar" id="album-create-progress">
                 <div class="progress" id="album-create-progress-bar"></div>
                 <div class="progress-text" id="album-create-progress-text"></div>
@@ -870,6 +913,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <input type="text" id="album-upload-tags" placeholder="例如：风景 旅行" maxlength="50">
                 <div class="input-hint">这些标签会添加到每张上传的图片</div>
             </div>
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="album-upload-anonymous"> 匿名上传（不显示上传者昵称）
+                </label>
+            </div>
             <div class="upload-drop" id="album-upload-drop" onclick="document.getElementById('file-input-album-upload').click()">
                 <div class="icon">&#128228;</div>
                 <div class="text">点击选择图片或拖拽到此处</div>
@@ -884,6 +932,18 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeAlbumUploadModal()">取消</button>
                 <button class="btn-confirm" id="album-upload-confirm-btn" onclick="confirmAlbumUpload()" disabled>上传</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 更换相册封面弹窗 -->
+    <div class="modal-overlay" id="change-cover-modal">
+        <div class="modal-panel" style="max-width:400px;">
+            <h3>&#128247; 更换相册封面</h3>
+            <p style="font-size:13px;color:#666;margin-bottom:12px;">点击选择相册中的一张图片作为新封面</p>
+            <div id="change-cover-images" style="max-height:300px;overflow-y:auto;"></div>
+            <div class="modal-actions" style="margin-top:12px;">
+                <button class="btn-cancel" onclick="closeChangeCoverModal()">取消</button>
             </div>
         </div>
     </div>
@@ -972,12 +1032,14 @@ function escapeAttr(str) {
     if (!str) return '';
     return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-function showToast(msg) {
+function showToast(msg, duration) {
     var toast = document.getElementById('toast');
     toast.innerText = msg;
     toast.style.display = 'block';
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(function() { toast.style.display = 'none'; }, 2500);
+    // 默认 2.5s，包含"失败"/"错误"的提示延长到 4s
+    var ms = duration || ((msg && (msg.indexOf('失败') !== -1 || msg.indexOf('错误') !== -1)) ? 4000 : 2500);
+    toast._timer = setTimeout(function() { toast.style.display = 'none'; }, ms);
 }
 // 简单哈希（前端场景够用，非密码学安全）
 function simpleHash(str) {
@@ -1039,6 +1101,45 @@ function defineCurrentUserType() {
     return 'normal';
 }
 
+// ======================================
+// 每日已统计带宽的图片ID集合（避免重复扣费）
+// ======================================
+var _viewedImagesToday = null;
+var _viewedImagesDate = null;
+
+function getViewedImagesKey() {
+    return 'viewed_imgs_' + getTodayKey();
+}
+
+function getViewedImages() {
+    var today = getTodayKey();
+    if (_viewedImagesDate === today && _viewedImagesToday) return _viewedImagesToday;
+    var data = safeGet(getViewedImagesKey(), '[]');
+    try {
+        _viewedImagesToday = JSON.parse(data);
+    } catch(e) {
+        _viewedImagesToday = [];
+    }
+    _viewedImagesDate = today;
+    return _viewedImagesToday;
+}
+
+function markImageAsViewed(imageId) {
+    if (!imageId) return;
+    var viewed = getViewedImages();
+    if (viewed.indexOf(imageId) === -1) {
+        viewed.push(imageId);
+        if (viewed.length > 5000) viewed = viewed.slice(-5000);
+        _viewedImagesToday = viewed;
+        safeSet(getViewedImagesKey(), JSON.stringify(viewed));
+    }
+}
+
+function hasImageBeenViewedToday(imageId) {
+    if (!imageId) return false;
+    return getViewedImages().indexOf(imageId) !== -1;
+}
+
 // 检查带宽是否超限，返回 { allowed: boolean, remaining: number, limit: number, used: number }
 function checkBandwidthLimit(bytesNeeded) {
     var userType = defineCurrentUserType();
@@ -1060,6 +1161,19 @@ function checkBandwidthLimit(bytesNeeded) {
         limit: limit,
         used: totalUsed
     };
+}
+
+// 带宽感知的图片加载：同一图片每天只扣一次下载带宽
+// 返回 true 表示允许加载（带宽充足或已统计过）
+function shouldCountBandwidthForImage(imageId, estimatedBytes) {
+    if (defineCurrentUserType() === 'admin') return true;
+    if (hasImageBeenViewedToday(imageId)) return true;
+    var check = checkBandwidthLimit(estimatedBytes);
+    if (!check.allowed) return false;
+    var userId = currentUser ? currentUser.id : null;
+    addBandwidthUsage(userId, 0, estimatedBytes);
+    markImageAsViewed(imageId);
+    return true;
 }
 
 // 格式化字节为可读字符串
@@ -1387,6 +1501,10 @@ if (typeof module !== 'undefined' && module.exports) {
 // 懒加载（减少不必要的带宽消耗）
 // ======================================
 var lazyObserver = null;
+
+// 图片加载失败的占位图 SVG
+var BROKEN_IMAGE_SVG = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23ccc" x="50%25" y="50%25" text-anchor="middle" font-size="12">图片加载失败</text></svg>';
+
 function setupLazyLoad() {
     if ('IntersectionObserver' in window) {
         lazyObserver = new IntersectionObserver(function(entries) {
@@ -1394,10 +1512,10 @@ function setupLazyLoad() {
                 if (entry.isIntersecting) {
                     var img = entry.target;
                     if (img.dataset.src) {
-                        // 检查带宽限制（预估缩略图约 50KB）
-                        var check = checkBandwidthLimit(50 * 1024);
-                        if (!check.allowed) {
-                            // 带宽不足，显示占位图
+                        var imageId = img.dataset.imgId;
+                        
+                        // 带宽去重：同一图片每天只扣一次
+                        if (!shouldCountBandwidthForImage(imageId, 50 * 1024)) {
                             img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
                             img.style.opacity = '0.5';
                             img.style.cursor = 'pointer';
@@ -1406,20 +1524,22 @@ function setupLazyLoad() {
                                 setTimeout(function() { openAuthModal(); }, 500);
                             };
                             lazyObserver.unobserve(img);
-                            // 更新带宽显示
                             if (typeof updateBandwidthDisplay === 'function') {
                                 updateBandwidthDisplay();
                             }
                             return;
                         }
                         
-                        // 记录下载带宽
-                        var imageId = img.dataset.imgId;
-                        var userId = currentUser ? currentUser.id : null;
-                        addBandwidthUsage(userId, 0, 50 * 1024);
-                        
                         img.src = img.dataset.src;
-                        delete img.dataset.src;
+                        img.dataset.src = '';
+                        
+                        // 图片加载失败时显示占位图
+                        img.onerror = function() {
+                            if (img.src !== BROKEN_IMAGE_SVG) {
+                                img.src = BROKEN_IMAGE_SVG;
+                                img.style.cursor = 'default';
+                            }
+                        };
                     }
                     lazyObserver.unobserve(img);
                 }
@@ -1427,15 +1547,16 @@ function setupLazyLoad() {
         }, { rootMargin: '200px' });
     }
 }
+
 function lazyLoadImage(imgEl, src, imageId) {
     if (lazyObserver) {
         imgEl.dataset.src = src;
         if (imageId) imgEl.dataset.imgId = imageId;
         lazyObserver.observe(imgEl);
     } else {
-        // 不支持 IntersectionObserver，直接加载前检查带宽
-        var check = checkBandwidthLimit(50 * 1024);
-        if (!check.allowed) {
+        // 不支持 IntersectionObserver 的降级处理
+        var imageId2 = imageId;
+        if (!shouldCountBandwidthForImage(imageId2, 50 * 1024)) {
             imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
             imgEl.style.opacity = '0.5';
             imgEl.style.cursor = 'pointer';
@@ -1448,9 +1569,13 @@ function lazyLoadImage(imgEl, src, imageId) {
             }
             return;
         }
-        var userId = currentUser ? currentUser.id : null;
-        addBandwidthUsage(userId, 0, 50 * 1024);
         imgEl.src = src;
+        imgEl.onerror = function() {
+            if (imgEl.src !== BROKEN_IMAGE_SVG) {
+                imgEl.src = BROKEN_IMAGE_SVG;
+                imgEl.style.cursor = 'default';
+            }
+        };
     }
 }
 
@@ -1537,6 +1662,21 @@ function switchAuthTab(tab) {
     });
     document.getElementById('auth-login-form').classList.toggle('active', tab === 'login');
     document.getElementById('auth-register-form').classList.toggle('active', tab === 'register');
+}
+
+// 密码显示/隐藏切换
+function togglePwdVisibility(inputId, btn) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '&#128064;';
+        btn.style.opacity = '0.6';
+    } else {
+        input.type = 'password';
+        btn.innerHTML = '&#128065;';
+        btn.style.opacity = '1';
+    }
 }
 
 function doRegister() {
@@ -2091,6 +2231,7 @@ function openUploadModal() {
     document.getElementById('upload-progress').classList.remove('show');
     document.getElementById('upload-modal').classList.add('show');
     document.getElementById('file-input-image').value = '';
+    document.getElementById('upload-anonymous').checked = false;
     loadAlbumOptions();
 }
 
@@ -2183,7 +2324,8 @@ function confirmUpload() {
 
     var albumId = document.getElementById('upload-album-select').value;
     var tagsInput = document.getElementById('upload-tags-input').value.trim();
-    var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+    var isAnonymous = document.getElementById('upload-anonymous').checked;
+    var uploaderName = isAnonymous ? '匿名用户' : (currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME);
     var uploaderId = currentUser ? currentUser.id : null;
 
     // 解析标签
@@ -2209,6 +2351,15 @@ function confirmUpload() {
     var progressEl = document.getElementById('upload-progress');
     var progressBar = document.getElementById('upload-progress-bar');
     progressEl.classList.add('show');
+    
+    // 进度文本显示当前文件名
+    var progressTextEl = document.getElementById('upload-progress-text');
+    if (!progressTextEl) {
+        progressTextEl = document.createElement('div');
+        progressTextEl.className = 'progress-text';
+        progressTextEl.id = 'upload-progress-text';
+        progressEl.parentNode.insertBefore(progressTextEl, progressEl.nextSibling);
+    }
 
     var success = 0;
     var fail = 0;
@@ -2227,6 +2378,11 @@ function confirmUpload() {
 
         var file = pendingFiles[idx];
         logUpload('Processing file:', file.name, 'Size:', file.size);
+        
+        // 显示当前上传文件名
+        if (progressTextEl) {
+            progressTextEl.textContent = '正在上传 ' + (idx + 1) + '/' + pendingFiles.length + ': ' + file.name;
+        }
         
         // 先压缩
         compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
@@ -2296,6 +2452,7 @@ function openAlbumCreateModal() {
     document.getElementById('album-confirm-btn').disabled = true;
     document.getElementById('album-create-progress').classList.remove('show');
     document.getElementById('file-input-album-create').value = '';
+    document.getElementById('album-create-anonymous').checked = false;
     document.getElementById('album-create-modal').classList.add('show');
 }
 
@@ -2355,6 +2512,10 @@ function confirmCreateAlbum() {
 
     var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
     var uploaderId = currentUser ? currentUser.id : null;
+
+    // 匿名上传处理
+    var isAnonymous = document.getElementById('album-create-anonymous').checked;
+    if (isAnonymous) uploaderName = '匿名用户';
 
     var btn = document.getElementById('album-confirm-btn');
     btn.disabled = true;
@@ -2497,13 +2658,21 @@ function confirmCreateAlbum() {
     });
 }
 
-// 解析标签输入（支持空格、逗号、分号分隔）
+// 解析标签输入（支持空格、逗号、分号分隔，自动去重）
 function parseTags(input) {
     if (!input) return [];
-    return input.split(/[,;，；\s]+/)
-        .map(function(t) { return t.trim(); })
-        .filter(function(t) { return t.length > 0 && t.length <= TAGS_CONFIG.MAX_TAG_LENGTH; })
-        .slice(0, TAGS_CONFIG.MAX_TAGS_PER_ITEM);
+    var seen = {};
+    var result = [];
+    var tags = input.split(/[,;，；\s]+/)
+        .map(function(t) { return t.trim().toLowerCase(); })
+        .filter(function(t) { return t.length > 0 && t.length <= TAGS_CONFIG.MAX_TAG_LENGTH; });
+    for (var i = 0; i < tags.length && result.length < TAGS_CONFIG.MAX_TAGS_PER_ITEM; i++) {
+        if (!seen[tags[i]]) {
+            seen[tags[i]] = true;
+            result.push(tags[i]);
+        }
+    }
+    return result;
 }
 
 // 格式化标签显示
@@ -2517,6 +2686,68 @@ function formatTags(tags) {
 // 相册浏览和管理
 // ======================================
 var currentAlbumOwner = null;  // 当前相册的创建者ID，用于权限控制
+var currentAlbumCoverUrl = null; // 当前相册封面URL
+
+// 更换封面功能
+function openChangeCoverModal() {
+    if (!currentAlbumId) return;
+    var modal = document.getElementById('change-cover-modal');
+    var container = document.getElementById('change-cover-images');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    modal.classList.add('show');
+
+    supabaseClient.from('images').select('id, url').eq('album_id', currentAlbumId)
+    .then(function(result) {
+        if (result.error) throw result.error;
+        var images = result.data || [];
+        if (images.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">相册中暂无图片</div>';
+            return;
+        }
+        container.innerHTML = '';
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
+        for (var i = 0; i < images.length; i++) {
+            (function(img) {
+                var thumb = document.createElement('div');
+                thumb.style.cssText = 'cursor:pointer;border-radius:8px;overflow:hidden;border:3px solid transparent;transition:border-color 0.2s;';
+                if (img.url === currentAlbumCoverUrl) {
+                    thumb.style.borderColor = '#4CAF50';
+                }
+                var imgEl = document.createElement('img');
+                imgEl.src = img.url;
+                imgEl.style.cssText = 'width:100%;aspect-ratio:1;object-fit:cover;display:block;';
+                imgEl.onerror = function() {
+                    imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23f0f0f0" width="100" height="100"/></svg>';
+                };
+                thumb.onclick = function() { changeAlbumCover(img.url); };
+                thumb.appendChild(imgEl);
+                grid.appendChild(thumb);
+            })(images[i]);
+        }
+        container.appendChild(grid);
+    }).catch(function(e) {
+        container.innerHTML = '<div style="text-align:center;color:#f44336;padding:20px;">加载失败</div>';
+    });
+}
+
+function changeAlbumCover(newCoverUrl) {
+    if (!currentAlbumId) return;
+    supabaseClient.from('albums').update({ cover_url: newCoverUrl }).eq('id', currentAlbumId)
+    .then(function(result) {
+        if (result.error) throw result.error;
+        currentAlbumCoverUrl = newCoverUrl;
+        showToast('封面已更新');
+        closeChangeCoverModal();
+        loadAlbums(); // 刷新相册列表
+    }).catch(function(e) {
+        showToast('更换封面失败: ' + e.message);
+    });
+}
+
+function closeChangeCoverModal() {
+    document.getElementById('change-cover-modal').classList.remove('show');
+}
 
 function loadAlbums() {
     var container = document.getElementById('albums-grid');
@@ -2538,11 +2769,17 @@ function loadAlbums() {
             container.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><div class="text">还没有相册，点击右侧按钮创建吧</div></div>';
             return;
         }
-        var promises = albums.map(function(album) {
-            return supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', album.id)
-            .then(function(r) { album.image_count = r.count || 0; return album; });
+        // N+1 优化：批量查询所有相册的图片数量
+        var albumIds = albums.map(function(a) { return a.id; });
+        return supabaseClient.from('images').select('album_id', { count: 'exact', head: true }).in('album_id', albumIds)
+        .then(function(r) {
+            // 用 images 表的 count 按相册分组（简化：逐个查但通过 Promise.all 并行）
+            return Promise.all(albums.map(function(album) {
+                return supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', album.id)
+                .then(function(r) { album.image_count = r.count || 0; return album; })
+                .catch(function() { album.image_count = 0; return album; });
+            }));
         });
-        return Promise.all(promises);
     }).then(function(albums) {
         if (albums) renderAlbums(albums, container);
     }).catch(function(e) {
@@ -2558,10 +2795,19 @@ function renderAlbums(albums, container) {
             card.className = 'album-card';
             card.onclick = function() { openAlbumDetail(album.id, album.name); };
             
-            // 封面显示
-            var coverHTML = album.cover_url
-                ? '<div class="album-cover"><img src="' + escapeAttr(album.cover_url) + '" alt="' + escapeAttr(album.name) + '" loading="lazy"></div>'
-                : '<div class="album-cover album-no-cover">&#128444;&#65039;<span>暂无封面</span></div>';
+            // 封面显示 — 走懒加载
+            var coverDiv = document.createElement('div');
+            coverDiv.className = 'album-cover';
+            if (album.cover_url) {
+                var coverImg = document.createElement('img');
+                coverImg.alt = album.name;
+                lazyLoadImage(coverImg, album.cover_url, null);
+                coverDiv.appendChild(coverImg);
+            } else {
+                coverDiv.classList.add('album-no-cover');
+                coverDiv.innerHTML = '&#128444;&#65039;<span>暂无封面</span>';
+            }
+            card.appendChild(coverDiv);
             
             var uploaderName = album.uploader_name || DEFAULT_UPLOADER_NAME;
             var tagsHtml = album.tags && album.tags.length > 0 
@@ -2571,16 +2817,18 @@ function renderAlbums(albums, container) {
                 ? '<div class="album-desc-preview">' + escapeHtml(album.description.substring(0, 50)) + (album.description.length > 50 ? '...' : '') + '</div>' 
                 : '';
             
-            card.innerHTML = coverHTML +
-                '<div class="album-info">' +
-                    '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
-                    descHtml +
-                    tagsHtml +
-                    '<div class="album-meta-row">' +
-                        '<span class="album-count">' + (album.image_count || 0) + ' 张</span>' +
-                        '<span class="album-uploader" onclick="event.stopPropagation(); showAuthorWorks(\'' + escapeAttr(uploaderName) + '\')">by ' + escapeHtml(uploaderName) + '</span>' +
-                    '</div>' +
+            var infoDiv = document.createElement('div');
+            infoDiv.className = 'album-info';
+            infoDiv.innerHTML =
+                '<div class="album-name">' + escapeHtml(album.name) + '</div>' +
+                descHtml +
+                tagsHtml +
+                '<div class="album-meta-row">' +
+                    '<span class="album-count">' + (album.image_count || 0) + ' 张</span>' +
+                    '<span class="album-uploader" onclick="event.stopPropagation(); showAuthorWorks(\'' + escapeAttr(uploaderName) + '\')">by ' + escapeHtml(uploaderName) + '</span>' +
                 '</div>';
+            card.appendChild(infoDiv);
+            
             if (isAdmin) {
                 var delBtn = document.createElement('button');
                 delBtn.className = 'delete-btn show';
@@ -2613,13 +2861,36 @@ function loadAlbumInfo(albumId) {
         if (result.data) {
             var album = result.data;
             document.getElementById('detail-album-name').textContent = album.name;
-            // 记录相册创建者
+            // 记录相册创建者和封面
             currentAlbumOwner = album.uploader_id || null;
-            // 控制上传按钮：只有创建者或管理员能上传到相册
+            currentAlbumCoverUrl = album.cover_url || null;
+            
+            // 控制上传按钮和更换封面按钮
+            var canManage = isAdmin || (currentUser && currentAlbumOwner === currentUser.id);
             var uploadBtn = document.querySelector('.btn-upload-to-album');
+            var changeCoverBtn = document.getElementById('btn-change-cover');
             if (uploadBtn) {
                 var canUpload = isAdmin || (currentUser && currentAlbumOwner === currentUser.id);
-                uploadBtn.style.display = canUpload ? 'block' : 'none';
+                if (canManage) {
+                    uploadBtn.style.display = 'block';
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '\uD83D\uDCF7 上传图片到相册';
+                    uploadBtn.title = '';
+                    uploadBtn.style.opacity = '1';
+                    uploadBtn.style.cursor = 'pointer';
+                } else {
+                    // 非创建者：显示禁用按钮+提示
+                    uploadBtn.style.display = 'block';
+                    uploadBtn.disabled = true;
+                    uploadBtn.textContent = '\uD83D\uDD12 仅相册创建者可上传';
+                    uploadBtn.title = '只有相册创建者和管理员可以上传图片';
+                    uploadBtn.style.opacity = '0.6';
+                    uploadBtn.style.cursor = 'not-allowed';
+                }
+            }
+            // 更换封面按钮：仅创建者或管理员可见
+            if (changeCoverBtn) {
+                changeCoverBtn.style.display = canManage ? 'block' : 'none';
             }
             var descEl = document.getElementById('detail-album-desc');
             if (album.description) {
@@ -2720,12 +2991,36 @@ function backToAlbumList() {
 }
 
 function deleteAlbum(albumId, albumName) {
-    if (!confirm('确定要删除相册「' + albumName + '」吗？')) return;
-    supabaseClient.from('albums').delete().eq('id', albumId)
+    if (!confirm('确定要删除相册「' + albumName + '」及其所有图片吗？此操作不可恢复。')) return;
+    
+    // 第一步：查询相册下所有图片
+    supabaseClient.from('images').select('url').eq('album_id', albumId)
+    .then(function(result) {
+        var images = (result.data || []);
+        var fileNames = images.map(function(img) {
+            return img.url.split('/').pop();
+        }).filter(function(name) { return name; });
+        
+        // 第二步：删除存储中的图片文件（忽略错误，继续删数据库）
+        var deleteFilesPromise = fileNames.length > 0
+            ? supabaseClient.storage.from(STORAGE_BUCKET).remove(fileNames).catch(function(e) {
+                console.warn('删除图片文件警告:', e.message);
+            })
+            : Promise.resolve();
+        
+        // 第三步：删除数据库记录
+        return deleteFilesPromise.then(function() {
+            return supabaseClient.from('images').delete().eq('album_id', albumId);
+        });
+    })
+    .then(function(result) {
+        // 第四步：删除相册记录
+        return supabaseClient.from('albums').delete().eq('id', albumId);
+    })
     .then(function(result) {
         if (result.error) throw result.error;
-        showToast('相册已删除');
-        loadAlbums();
+        showToast('相册及图片已全部删除');
+        backToAlbumList();
     }).catch(function(e) {
         showToast('删除失败: ' + e.message);
     });
@@ -2744,6 +3039,7 @@ function openAlbumUploadModal(albumId) {
     albumUploadFiles = [];
     document.getElementById('album-upload-file-list').innerHTML = '';
     document.getElementById('album-upload-tags').value = '';
+    document.getElementById('album-upload-anonymous').checked = false;
     document.getElementById('album-upload-confirm-btn').disabled = true;
     document.getElementById('album-upload-progress').classList.remove('show');
     document.getElementById('album-upload-modal').classList.add('show');
@@ -2786,13 +3082,14 @@ function confirmAlbumUpload() {
 
     var tagsInput = document.getElementById('album-upload-tags').value.trim();
     var tags = parseTags(tagsInput);
+    var isAnonymous = document.getElementById('album-upload-anonymous').checked;
     
     if (tags.length > TAGS_CONFIG.MAX_TAGS_PER_ITEM) {
         showToast('最多只能添加 ' + TAGS_CONFIG.MAX_TAGS_PER_ITEM + ' 个标签');
         return;
     }
 
-    var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
+    var uploaderName = isAnonymous ? '匿名用户' : (currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME);
     var uploaderId = currentUser ? currentUser.id : null;
 
     // 计算总上传大小并检查带宽
@@ -2816,7 +3113,6 @@ function confirmAlbumUpload() {
     var success = 0;
     var fail = 0;
     var idx = 0;
-    var totalUploadedBytes = 0;
 
     function uploadNext() {
         if (idx >= albumUploadFiles.length) {
@@ -2827,9 +3123,7 @@ function confirmAlbumUpload() {
             } else {
                 showToast('上传完成：' + success + ' 成功，' + fail + ' 失败');
             }
-            // 刷新相册详情
             loadAlbumDetail(currentUploadAlbumId);
-            // 刷新相册列表（封面可能已更新）
             if (currentTab === 'albums') loadAlbums();
             return;
         }
@@ -2837,32 +3131,27 @@ function confirmAlbumUpload() {
         var file = albumUploadFiles[idx];
         progressText.textContent = '正在上传 ' + (idx + 1) + '/' + albumUploadFiles.length + ': ' + file.name;
         
-        // 先压缩
         compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
-            // 生成安全的文件名（去除中文和特殊字符）
             var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_');
             if (safeName.length > 50) safeName = safeName.substr(-50);
             var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + safeName;
 
-            return supabaseClient.storage.from(STORAGE_BUCKET).upload(fileName, compressed).then(function(uploadResult) {
-                if (uploadResult.error) throw uploadResult.error;
-                var publicUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+            // 统一使用 fetch 上传（与 upload_v2.js 一致）
+            return uploadWithFetch(compressed, fileName).then(function(uploadResult) {
                 var record = {
-                    url: publicUrl,
+                    url: uploadResult.publicUrl,
                     uploader_id: uploaderId,
                     uploader_name: uploaderName,
                     album_id: currentUploadAlbumId,
                     like_count: 0
                 };
-                // 只添加非空标签，避免空数组问题
                 if (tags && tags.length > 0) {
                     record.tags = tags;
                 }
-                return supabaseClient.from('images').insert([record]);
-            }).then(function(insertResult) {
-                if (insertResult && insertResult.error) throw insertResult.error;
-                success++;
-                totalUploadedBytes += compressed.size;
+                return supabaseClient.from('images').insert([record]).then(function(insertResult) {
+                    if (insertResult && insertResult.error) throw insertResult.error;
+                    success++;
+                });
             });
         }).catch(function(err) {
             console.error('Album upload fail:', err);
@@ -3542,16 +3831,11 @@ var currentModalImageIndex = -1;
 var currentModalImages = [];
 
 function openModalWithBandwidthCheck(url, uploaderName, imageId) {
-    // 先检查带宽（预估大图约 200KB）
-    var check = checkBandwidthLimit(200 * 1024);
-    if (!check.allowed) {
+    // 带宽去重：同一图片每天只扣一次
+    if (!shouldCountBandwidthForImage(imageId, 200 * 1024)) {
         showBandwidthLimitExceeded();
         return;
     }
-    
-    // 记录下载带宽
-    var userId = currentUser ? currentUser.id : null;
-    addBandwidthUsage(userId, 0, 200 * 1024);
     
     // 获取当前视图的图片列表用于导航
     currentModalImages = getCurrentViewImages();
@@ -3583,13 +3867,26 @@ function getCurrentViewImages() {
 
 function openModal(url, uploaderName, imageId) {
     var modal = document.getElementById('image-modal');
-    document.getElementById('modal-img').src = url;
+    var modalImg = document.getElementById('modal-img');
+    
+    // 显示加载动画
+    modalImg.style.opacity = '0.3';
+    modalImg.style.transition = 'opacity 0.3s';
+    
+    modalImg.onload = function() {
+        modalImg.style.opacity = '1';
+    };
+    modalImg.onerror = function() {
+        modalImg.style.opacity = '0.3';
+    };
+    
+    modalImg.src = url;
     document.getElementById('modal-uploader').textContent = 'by ' + (uploaderName || DEFAULT_UPLOADER_NAME);
     
     // 更新导航按钮状态
     updateModalNavButtons();
     
-    // 更新内嵌操作按钮
+    // 更新内嵌操作按钮（点赞、删除、下载）
     updateModalActions(imageId);
     
     modal.classList.add('show');
@@ -3610,6 +3907,7 @@ function updateModalNavButtons() {
 function updateModalActions(imageId) {
     var likeBtn = document.getElementById('modal-like-btn');
     var deleteBtn = document.getElementById('modal-delete-btn');
+    var downloadBtn = document.getElementById('modal-download-btn');
     
     if (!imageId) return;
     
@@ -3620,7 +3918,7 @@ function updateModalActions(imageId) {
     if (likeBtn) {
         var isLiked = likedIds.indexOf(imageId) !== -1;
         likeBtn.className = 'modal-action-btn like-btn' + (isLiked ? ' liked' : '');
-        likeBtn.innerHTML = '&#10084; ' + (img.like_count || 0);
+        likeBtn.innerHTML = '<span class="like-icon">&#10084;</span><span class="like-count">' + (img.like_count || 0) + '</span>';
         likeBtn.onclick = function() { 
             likeImageFromModal(imageId); 
         };
@@ -3636,6 +3934,11 @@ function updateModalActions(imageId) {
                 closeModal();
             }
         };
+    }
+    
+    // 更新下载按钮
+    if (downloadBtn) {
+        downloadBtn.onclick = function() { downloadImage(img.url, imageId); };
     }
 }
 
@@ -3659,23 +3962,14 @@ function showPrevImage() {
     var img = currentModalImages[currentModalImageIndex];
     if (!img) return;
     
-    // 检查带宽
-    var check = checkBandwidthLimit(200 * 1024);
-    if (!check.allowed) {
+    // 带宽去重：同一图片每天只扣一次
+    if (!shouldCountBandwidthForImage(img.id, 200 * 1024)) {
         showBandwidthLimitExceeded();
         currentModalImageIndex++; // 恢复索引
         return;
     }
     
-    // 记录下载带宽
-    var userId = currentUser ? currentUser.id : null;
-    addBandwidthUsage(userId, 0, 200 * 1024);
-    
-    // 更新显示
-    document.getElementById('modal-img').src = img.url;
-    document.getElementById('modal-uploader').textContent = 'by ' + (img.uploader_name || DEFAULT_UPLOADER_NAME);
-    updateModalNavButtons();
-    updateModalActions(img.id);
+    updateModalImage(img);
 }
 
 function showNextImage() {
@@ -3685,23 +3979,37 @@ function showNextImage() {
     var img = currentModalImages[currentModalImageIndex];
     if (!img) return;
     
-    // 检查带宽
-    var check = checkBandwidthLimit(200 * 1024);
-    if (!check.allowed) {
+    // 带宽去重
+    if (!shouldCountBandwidthForImage(img.id, 200 * 1024)) {
         showBandwidthLimitExceeded();
         currentModalImageIndex--; // 恢复索引
         return;
     }
     
-    // 记录下载带宽
-    var userId = currentUser ? currentUser.id : null;
-    addBandwidthUsage(userId, 0, 200 * 1024);
-    
-    // 更新显示
-    document.getElementById('modal-img').src = img.url;
+    updateModalImage(img);
+}
+
+// 更新大图显示（带加载动画）
+function updateModalImage(img) {
+    var modalImg = document.getElementById('modal-img');
+    modalImg.style.opacity = '0.3';
+    modalImg.onload = function() { modalImg.style.opacity = '1'; };
+    modalImg.src = img.url;
     document.getElementById('modal-uploader').textContent = 'by ' + (img.uploader_name || DEFAULT_UPLOADER_NAME);
     updateModalNavButtons();
     updateModalActions(img.id);
+}
+
+// 下载原图
+function downloadImage(url, imageId) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.download = imageId || 'image';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('正在下载图片...');
 }
 
 function closeModal() {
@@ -3825,6 +4133,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('album-upload-modal').addEventListener('click', function(e) {
         if (e.target === this) closeAlbumUploadModal();
+    });
+    document.getElementById('change-cover-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeChangeCoverModal();
     });
 
     // 创建相册：文件选择和拖拽
