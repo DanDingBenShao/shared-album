@@ -239,6 +239,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             justify-content: center; font-size: 18px; color: #666; flex-shrink: 0;
         }
         .album-detail-header .album-title { font-size: 18px; font-weight: 500; color: #333; }
+        .album-detail-header .album-title-count { font-size: 12px; color: #999; margin-left: 8px; }
         .album-detail-header .album-desc { font-size: 12px; color: #999; }
 
         /* ===== 大图查看 ===== */
@@ -535,6 +536,39 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             font-size: 11px; color: #666; text-align: center; margin-top: 4px;
         }
 
+        /* ===== v5 新增：创建相册图片预览 ===== */
+        .album-file-preview {
+            max-height: 150px; overflow-y: auto;
+            background: #f9f9f9; border-radius: 8px;
+            margin-bottom: 12px; padding: 4px;
+        }
+        .album-preview-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; font-size: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .album-preview-item:last-child {
+            border-bottom: none;
+        }
+        .album-preview-name {
+            flex: 1; color: #333; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+        .album-preview-size {
+            color: #999; font-size: 11px; flex-shrink: 0;
+        }
+        .album-preview-remove {
+            width: 20px; height: 20px; border-radius: 50%;
+            border: none; background: #f44336; color: white;
+            cursor: pointer; font-size: 14px; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; padding: 0;
+            transition: background 0.2s;
+        }
+        .album-preview-remove:hover {
+            background: #d32f2f;
+        }
+
     </style>
 </head>
 <body>
@@ -653,6 +687,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <button class="back-btn" onclick="backToAlbumList()">&#8592;</button>
                 <div class="album-detail-info">
                     <div class="album-title" id="detail-album-name"></div>
+                    <span class="album-title-count" id="detail-album-count" style="display:none;"></span>
                     <div class="album-tags" id="detail-album-tags" style="display:none;"></div>
                     <div class="album-desc" id="detail-album-desc" style="display:none;"></div>
                 </div>
@@ -787,26 +822,41 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </div>
     </div>
 
-    <!-- 创建相册弹窗（v4 新版） -->
+    <!-- 创建相册弹窗（v5：先选图片再一并提交） -->
     <div class="modal-overlay" id="album-create-modal">
-        <div class="modal-panel">
+        <div class="modal-panel" style="max-width:500px;">
             <h3>&#128218; 创建相册</h3>
             <div class="form-group">
                 <label>相册名称 *</label>
                 <input type="text" id="album-name-input" placeholder="给相册起个名字" maxlength="30" oninput="onAlbumFormInput()">
             </div>
             <div class="form-group">
+                <label>选择图片（至少选一张，可多次添加）</label>
+                <div class="upload-drop" id="album-create-drop" onclick="document.getElementById('file-input-album-create').click()" style="padding:20px;">
+                    <div class="icon">&#128228;</div>
+                    <div class="text">点击选择图片或拖拽到此处</div>
+                    <div class="compress-info">图片将自动压缩，支持批量选择</div>
+                </div>
+                <input type="file" class="hidden-input" id="file-input-album-create" multiple accept="image/*">
+            </div>
+            <div class="album-file-preview" id="album-file-list">
+                <div style="text-align:center;color:#999;font-size:13px;padding:8px;">还未选择图片</div>
+            </div>
+            <div class="form-group">
                 <label>相册描述</label>
-                <textarea id="album-desc-input" placeholder="简单描述一下这个相册（选填）" maxlength="200" rows="3"></textarea>
+                <textarea id="album-desc-input" placeholder="简单描述一下这个相册（选填）" maxlength="200" rows="2"></textarea>
             </div>
             <div class="form-group">
                 <label>标签（最多3个，用空格或逗号分隔）</label>
                 <input type="text" id="album-tags-input" placeholder="例如：风景 旅行 2024" maxlength="50">
-                <div class="input-hint">标签用于搜索，如：#风景 #旅行</div>
+            </div>
+            <div class="progress-bar" id="album-create-progress">
+                <div class="progress" id="album-create-progress-bar"></div>
+                <div class="progress-text" id="album-create-progress-text"></div>
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeAlbumCreateModal()">取消</button>
-                <button class="btn-confirm purple" id="album-confirm-btn" onclick="confirmCreateAlbum()" disabled>创建</button>
+                <button class="btn-confirm purple" id="album-confirm-btn" onclick="confirmCreateAlbum()" disabled>创建并上传</button>
             </div>
         </div>
     </div>
@@ -2232,32 +2282,76 @@ function confirmUpload() {
 
 
 // ======================================
-// 创建相册（v4 新版：只创建空相册，不上传封面）
+// 创建相册（v5：先选图片再一并提交）
 // ======================================
+var albumCreateFiles = [];  // 本地暂存的图片文件
+
 function openAlbumCreateModal() {
     if (!checkUploadPermission()) return;
+    albumCreateFiles = [];
     document.getElementById('album-name-input').value = '';
     document.getElementById('album-desc-input').value = '';
     document.getElementById('album-tags-input').value = '';
+    document.getElementById('album-file-list').innerHTML = '';
     document.getElementById('album-confirm-btn').disabled = true;
+    document.getElementById('album-create-progress').classList.remove('show');
+    document.getElementById('file-input-album-create').value = '';
     document.getElementById('album-create-modal').classList.add('show');
 }
 
 function closeAlbumCreateModal() {
     document.getElementById('album-create-modal').classList.remove('show');
+    document.getElementById('file-input-album-create').value = '';
+    albumCreateFiles = [];
 }
 
 function onAlbumFormInput() {
     var name = document.getElementById('album-name-input').value.trim();
-    document.getElementById('album-confirm-btn').disabled = !name;
+    // 有相册名且有图片才能确认
+    document.getElementById('album-confirm-btn').disabled = !name || albumCreateFiles.length === 0;
+}
+
+function handleAlbumCreateFileSelect(files) {
+    var filtered = [];
+    for (var i = 0; i < files.length; i++) {
+        if (files[i].type && files[i].type.indexOf('image/') === 0) filtered.push(files[i]);
+    }
+    // 追加而不是替换，支持多次选择
+    albumCreateFiles = albumCreateFiles.concat(filtered);
+    renderAlbumCreatePreview();
+    onAlbumFormInput();
+}
+
+function removeAlbumCreateFile(index) {
+    albumCreateFiles.splice(index, 1);
+    renderAlbumCreatePreview();
+    onAlbumFormInput();
+}
+
+function renderAlbumCreatePreview() {
+    var listEl = document.getElementById('album-file-list');
+    if (albumCreateFiles.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:8px;">还未选择图片</div>';
+        return;
+    }
+    var html = '';
+    for (var j = 0; j < albumCreateFiles.length; j++) {
+        html += '<div class="album-preview-item">' +
+            '<span class="album-preview-name" title="' + escapeHtml(albumCreateFiles[j].name) + '">' + escapeHtml(albumCreateFiles[j].name) + '</span>' +
+            '<span class="album-preview-size">' + (albumCreateFiles[j].size / 1024).toFixed(1) + ' KB</span>' +
+            '<button class="album-preview-remove" onclick="removeAlbumCreateFile(' + j + ')">&times;</button>' +
+        '</div>';
+    }
+    listEl.innerHTML = html;
 }
 
 function confirmCreateAlbum() {
     var albumName = document.getElementById('album-name-input').value.trim();
     var albumDesc = document.getElementById('album-desc-input').value.trim();
     var tagsInput = document.getElementById('album-tags-input').value.trim();
-    
+
     if (!albumName) { showToast('请输入相册名称'); return; }
+    if (albumCreateFiles.length === 0) { showToast('请至少选择一张图片'); return; }
 
     var uploaderName = currentUser ? (currentUser.nickname || currentUser.id) : DEFAULT_UPLOADER_NAME;
     var uploaderId = currentUser ? currentUser.id : null;
@@ -2265,7 +2359,6 @@ function confirmCreateAlbum() {
     var btn = document.getElementById('album-confirm-btn');
     btn.disabled = true;
 
-    // 解析标签
     var tags = parseTags(tagsInput);
     if (tags.length > TAGS_CONFIG.MAX_TAGS_PER_ITEM) {
         showToast('最多只能添加 ' + TAGS_CONFIG.MAX_TAGS_PER_ITEM + ' 个标签');
@@ -2273,17 +2366,35 @@ function confirmCreateAlbum() {
         return;
     }
 
+    // 计算总上传大小并检查带宽
+    var totalUploadBytes = 0;
+    for (var i = 0; i < albumCreateFiles.length; i++) {
+        totalUploadBytes += albumCreateFiles[i].size;
+    }
+    var check = checkBandwidthLimit(totalUploadBytes);
+    if (!check.allowed) {
+        showToast('上传失败：今日上传额度不足，剩余 ' + formatBytes(check.remaining));
+        btn.disabled = false;
+        return;
+    }
+
+    // 显示进度条
+    var progressEl = document.getElementById('album-create-progress');
+    var progressBar = document.getElementById('album-create-progress-bar');
+    var progressText = document.getElementById('album-create-progress-text');
+    progressEl.classList.add('show');
+    progressText.textContent = '正在创建相册...';
+
     var record = {
         name: albumName,
-        cover_url: null,  // 封面由第一张上传的图片自动设置
+        cover_url: null,
         uploader_id: uploaderId,
         uploader_name: uploaderName
     };
-    // 可选字段：只有列存在时才添加（兼容未执行 v4 迁移的数据库）
     if (albumDesc) record.description = albumDesc;
     if (tags.length > 0) record.tags = tags;
 
-    // 检测并去掉不存在的列，然后重试
+    // 第一步：创建相册记录
     function tryInsert(rec, retryCount) {
         return supabaseClient.from('albums').insert([rec]).select().then(function(result) {
             if (result.error) {
@@ -2307,16 +2418,80 @@ function confirmCreateAlbum() {
     }
 
     tryInsert(record, 0).then(function(result) {
-        if (!result) return;
-        closeAlbumCreateModal();
-        showToast('相册「' + albumName + '」创建成功');
-        if (currentTab === 'albums') loadAlbums();
-        if (result.data && result.data[0]) {
-            openAlbumDetail(result.data[0].id, result.data[0].name);
+        if (!result || !result.data || !result.data[0]) return;
+        var albumId = result.data[0].id;
+        progressText.textContent = '相册已创建，正在上传图片...';
+
+        // 第二步：批量上传图片
+        var success = 0;
+        var fail = 0;
+        var idx = 0;
+        var firstImageUrl = null;  // 用第一张成功的图作为封面
+
+        function uploadNext() {
+            if (idx >= albumCreateFiles.length) {
+                // 所有图片上传完毕
+                progressEl.classList.remove('show');
+                closeAlbumCreateModal();
+                if (fail === 0) {
+                    showToast('相册「' + albumName + '」创建成功，共 ' + success + ' 张图片');
+                } else {
+                    showToast('相册已创建，上传完成：' + success + ' 成功，' + fail + ' 失败');
+                }
+                // 更新封面为第一张成功的图
+                if (firstImageUrl) {
+                    supabaseClient.from('albums').update({ cover_url: firstImageUrl }).eq('id', albumId)
+                    .then(function() {
+                        if (currentTab === 'albums') loadAlbums();
+                    }).catch(function() {});
+                } else {
+                    if (currentTab === 'albums') loadAlbums();
+                }
+                return;
+            }
+
+            var file = albumCreateFiles[idx];
+            progressText.textContent = '上传 ' + (idx + 1) + '/' + albumCreateFiles.length + ': ' + file.name;
+
+            compressImage(file, COMPRESS_MAX_WIDTH, COMPRESS_QUALITY).then(function(compressed) {
+                var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_');
+                if (safeName.length > 50) safeName = safeName.substr(-50);
+                var fileName = Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + safeName;
+
+                return uploadWithFetch(compressed, fileName).then(function(uploadResult) {
+                    var imgRecord = {
+                        url: uploadResult.publicUrl,
+                        uploader_id: uploaderId,
+                        uploader_name: uploaderName,
+                        album_id: albumId,
+                        like_count: 0
+                    };
+                    if (tags && tags.length > 0) {
+                        imgRecord.tags = tags;
+                    }
+                    return supabaseClient.from('images').insert([imgRecord]).then(function(insertResult) {
+                        if (insertResult && insertResult.error) throw insertResult.error;
+                        success++;
+                        if (!firstImageUrl) firstImageUrl = uploadResult.publicUrl;
+                    });
+                });
+            }).catch(function(err) {
+                console.error('Album image upload fail:', err);
+                fail++;
+                var errorMsg = err && err.message ? err.message : '上传失败';
+                showToast(file.name + ': ' + errorMsg);
+            }).finally(function() {
+                idx++;
+                progressBar.style.width = (idx / albumCreateFiles.length * 100) + '%';
+                uploadNext();
+            });
         }
+
+        uploadNext();
     }).catch(function(err) {
         console.error('Create album fail:', err);
         showToast('创建失败: ' + (err.message || '未知错误'));
+        progressEl.classList.remove('show');
     }).finally(function() {
         btn.disabled = false;
     });
@@ -2341,6 +2516,8 @@ function formatTags(tags) {
 // ======================================
 // 相册浏览和管理
 // ======================================
+var currentAlbumOwner = null;  // 当前相册的创建者ID，用于权限控制
+
 function loadAlbums() {
     var container = document.getElementById('albums-grid');
     container.innerHTML = '<div class="loading">加载中...</div>';
@@ -2425,7 +2602,7 @@ function openAlbumDetail(albumId, albumName) {
     document.querySelectorAll('.tab').forEach(function(t) {
         t.classList.toggle('active', t.dataset.tab === 'albums');
     });
-    // 加载相册信息（包括描述）
+    // 加载相册信息（包括描述和创建者）
     loadAlbumInfo(albumId);
     loadAlbumDetail(albumId);
 }
@@ -2436,6 +2613,14 @@ function loadAlbumInfo(albumId) {
         if (result.data) {
             var album = result.data;
             document.getElementById('detail-album-name').textContent = album.name;
+            // 记录相册创建者
+            currentAlbumOwner = album.uploader_id || null;
+            // 控制上传按钮：只有创建者或管理员能上传到相册
+            var uploadBtn = document.querySelector('.btn-upload-to-album');
+            if (uploadBtn) {
+                var canUpload = isAdmin || (currentUser && currentAlbumOwner === currentUser.id);
+                uploadBtn.style.display = canUpload ? 'block' : 'none';
+            }
             var descEl = document.getElementById('detail-album-desc');
             if (album.description) {
                 descEl.textContent = album.description;
@@ -2491,12 +2676,14 @@ function loadMoreAlbumImages(albumId) {
                 container.innerHTML = '';
                 state.allImages = images;
                 renderImages(images, container, true);
-                // 更新图片数量显示
-                document.getElementById('detail-album-desc').textContent = '加载中...';
-                // 获取总数
+                // 获取图片总数，追加到标题旁显示
                 supabaseClient.from('images').select('*', { count: 'exact', head: true }).eq('album_id', albumId)
                     .then(function(r) {
-                        document.getElementById('detail-album-desc').textContent = (r.count || images.length) + ' 张图片';
+                        var countEl = document.getElementById('detail-album-count');
+                        if (countEl) {
+                            countEl.textContent = (r.count || images.length) + ' 张图片';
+                            countEl.style.display = 'inline';
+                        }
                     });
             } else {
                 state.allImages = state.allImages.concat(images);
@@ -3640,6 +3827,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === this) closeAlbumUploadModal();
     });
 
+    // 创建相册：文件选择和拖拽
+    setupDragDrop('album-create-drop', 'album-create');
+    document.getElementById('file-input-album-create').addEventListener('change', function(e) {
+        handleAlbumCreateFileSelect(e.target.files);
+        this.value = '';
+    });
+
     loadImages();
 });
 
@@ -3680,7 +3874,13 @@ function setupDragDrop(dropId, type) {
     dz.addEventListener('dragleave', function() { dz.classList.remove('dragover'); });
     dz.addEventListener('drop', function(e) {
         e.preventDefault(); dz.classList.remove('dragover');
-        handleFileSelect(e.dataTransfer.files, type);
+        if (type === 'album-create') {
+            handleAlbumCreateFileSelect(e.dataTransfer.files);
+        } else if (type === 'album-upload') {
+            handleAlbumFileSelect(e.dataTransfer.files);
+        } else {
+            handleFileSelect(e.dataTransfer.files, type);
+        }
     });
 }
 
