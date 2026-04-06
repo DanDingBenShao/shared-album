@@ -568,6 +568,23 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         .album-preview-remove:hover {
             background: #d32f2f;
         }
+        .album-preview-cover-btn {
+            width: 22px; height: 22px; border-radius: 4px;
+            border: 1px solid #ddd; background: #fafafa; color: #ccc;
+            cursor: pointer; font-size: 14px; line-height: 1;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; padding: 0;
+            transition: all 0.2s;
+        }
+        .album-preview-cover-btn:hover {
+            border-color: #FFA726; color: #FFA726;
+        }
+        .album-preview-cover-btn.active {
+            border-color: #FFA726; background: #FFF3E0; color: #F57C00;
+        }
+        .album-preview-cover {
+            background: #FFFDE7;
+        }
 
         /* ===== 密码显示/隐藏按钮 ===== */
         .pwd-toggle-btn {
@@ -880,6 +897,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             <div class="album-file-preview" id="album-file-list">
                 <div style="text-align:center;color:#999;font-size:13px;padding:8px;">还未选择图片</div>
             </div>
+            <div style="font-size:11px;color:#999;margin-top:-8px;margin-bottom:4px;">&#9733; 星标标记的图片将作为相册封面</div>
             <div class="form-group">
                 <label>相册描述</label>
                 <textarea id="album-desc-input" placeholder="简单描述一下这个相册（选填）" maxlength="200" rows="2"></textarea>
@@ -2441,10 +2459,12 @@ function confirmUpload() {
 // 创建相册（v5：先选图片再一并提交）
 // ======================================
 var albumCreateFiles = [];  // 本地暂存的图片文件
+var albumCoverIndex = 0;    // 用户选择的封面索引，默认第一张
 
 function openAlbumCreateModal() {
     if (!checkUploadPermission()) return;
     albumCreateFiles = [];
+    albumCoverIndex = 0;
     document.getElementById('album-name-input').value = '';
     document.getElementById('album-desc-input').value = '';
     document.getElementById('album-tags-input').value = '';
@@ -2481,8 +2501,16 @@ function handleAlbumCreateFileSelect(files) {
 
 function removeAlbumCreateFile(index) {
     albumCreateFiles.splice(index, 1);
+    // 如果删除的是封面或者封面索引越界，重置为0
+    if (albumCoverIndex >= albumCreateFiles.length) albumCoverIndex = 0;
+    if (albumCreateFiles.length === 0) albumCoverIndex = 0;
     renderAlbumCreatePreview();
     onAlbumFormInput();
+}
+
+function setAlbumCover(index) {
+    albumCoverIndex = index;
+    renderAlbumCreatePreview();
 }
 
 function renderAlbumCreatePreview() {
@@ -2493,7 +2521,9 @@ function renderAlbumCreatePreview() {
     }
     var html = '';
     for (var j = 0; j < albumCreateFiles.length; j++) {
-        html += '<div class="album-preview-item">' +
+        var isCover = (j === albumCoverIndex);
+        html += '<div class="album-preview-item' + (isCover ? ' album-preview-cover' : '') + '">' +
+            '<button class="album-preview-cover-btn' + (isCover ? ' active' : '') + '" onclick="setAlbumCover(' + j + ')" title="点击设为封面">&#9733;</button>' +
             '<span class="album-preview-name" title="' + escapeHtml(albumCreateFiles[j].name) + '">' + escapeHtml(albumCreateFiles[j].name) + '</span>' +
             '<span class="album-preview-size">' + (albumCreateFiles[j].size / 1024).toFixed(1) + ' KB</span>' +
             '<button class="album-preview-remove" onclick="removeAlbumCreateFile(' + j + ')">&times;</button>' +
@@ -2587,7 +2617,8 @@ function confirmCreateAlbum() {
         var success = 0;
         var fail = 0;
         var idx = 0;
-        var firstImageUrl = null;  // 用第一张成功的图作为封面
+        var coverIndex = Math.min(albumCoverIndex, albumCreateFiles.length - 1);  // 确保封面索引合法
+        var uploadedUrls = [];  // 记录每张图的上传URL，用于设封面
 
         function uploadNext() {
             if (idx >= albumCreateFiles.length) {
@@ -2599,9 +2630,10 @@ function confirmCreateAlbum() {
                 } else {
                     showToast('相册已创建，上传完成：' + success + ' 成功，' + fail + ' 失败');
                 }
-                // 更新封面为第一张成功的图
-                if (firstImageUrl) {
-                    supabaseClient.from('albums').update({ cover_url: firstImageUrl }).eq('id', albumId)
+                // 更新封面为用户选择的图
+                var coverUrl = uploadedUrls[coverIndex] || uploadedUrls[0];
+                if (coverUrl) {
+                    supabaseClient.from('albums').update({ cover_url: coverUrl }).eq('id', albumId)
                     .then(function() {
                         if (currentTab === 'albums') loadAlbums();
                     }).catch(function() {});
@@ -2633,7 +2665,7 @@ function confirmCreateAlbum() {
                     return supabaseClient.from('images').insert([imgRecord]).then(function(insertResult) {
                         if (insertResult && insertResult.error) throw insertResult.error;
                         success++;
-                        if (!firstImageUrl) firstImageUrl = uploadResult.publicUrl;
+                        uploadedUrls.push(uploadResult.publicUrl);
                     });
                 });
             }).catch(function(err) {
@@ -2641,6 +2673,7 @@ function confirmCreateAlbum() {
                 fail++;
                 var errorMsg = err && err.message ? err.message : '上传失败';
                 showToast(file.name + ': ' + errorMsg);
+                uploadedUrls.push(null);  // 占位保持索引对应
             }).finally(function() {
                 idx++;
                 progressBar.style.width = (idx / albumCreateFiles.length * 100) + '%';
