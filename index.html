@@ -730,17 +730,6 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             z-index: 5;
         }
 
-        /* Swiper 开始提示（点击进入） */
-        .swiper-start-hint {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 60vh; cursor: pointer; padding: 40px 20px;
-            transition: all 0.2s;
-        }
-        .swiper-start-hint:hover { background: #fafafa; }
-        .swiper-start-icon { font-size: 64px; margin-bottom: 16px; }
-        .swiper-start-text { font-size: 18px; color: #333; margin-bottom: 8px; }
-        .swiper-start-sub { font-size: 13px; color: #999; }
-
         /* ===== 大图加载动画 ===== */
         .image-modal img {
             transition: opacity 0.3s ease;
@@ -3798,6 +3787,9 @@ function openSwiper(albumId) {
         '<div class="swiper-loading">加载中...</div>' +
     '</div>';
 
+    // 禁止背景页面滚动
+    document.body.style.overflow = 'hidden';
+
     // 绑定触摸/滚轮/键盘事件
     setupSwiperEvents();
 
@@ -3943,10 +3935,20 @@ function swiperPrev() {
 
 // 关闭 swiper
 function closeSwiper() {
+    // 移除整个 swiper-container 元素（包括 fixed 定位和黑色背景）
     var view = document.getElementById('swiper-view');
-    if (view) view.innerHTML = '';
+    if (view) {
+        var parent = view.parentNode;
+        if (parent) parent.removeChild(view);
+    }
+    // 清空容器
+    var container = document.getElementById(swiperState.containerId);
+    if (container) container.innerHTML = '';
     swiperState.images = [];
     swiperState.index = 0;
+
+    // 恢复页面滚动
+    document.body.style.overflow = '';
 
     // 恢复原始面板视图
     if (swiperState.mode === 'album' && swiperState.albumId) {
@@ -3954,6 +3956,8 @@ function closeSwiper() {
         backToAlbumList();
     } else if (currentTab === 'home') {
         loadImages();
+    } else if (currentTab === 'recommend') {
+        loadRecommend();
     }
 }
 
@@ -4178,15 +4182,7 @@ function fetchAlbumImages(page, pageSize, albumId) {
 var likedIds = JSON.parse(safeGet('likedIds', '[]'));
 
 function loadImages() {
-    var container = document.getElementById('home-images');
-    container.innerHTML = '<div class="swiper-start-hint" onclick="startHomeSwiper()">' +
-        '<div class="swiper-start-icon">&#128247;</div>' +
-        '<div class="swiper-start-text">点击开始浏览最新上传</div>' +
-        '<div class="swiper-start-sub">上下滑动切换图片</div>' +
-    '</div>';
-}
-
-function startHomeSwiper() {
+    // 直接自动打开 swiper，不需要点击提示
     initSwiper('home-images', fetchLatestImages, 'latest');
     openSwiper();
 }
@@ -4278,15 +4274,7 @@ function formatTime(timestamp) {
 // 推荐功能
 // ======================================
 function loadRecommend() {
-    var container = document.getElementById('recommend-images');
-    container.innerHTML = '<div class="swiper-start-hint" onclick="startRecommendSwiper()">' +
-        '<div class="swiper-start-icon">&#127775;</div>' +
-        '<div class="swiper-start-text">点击开始随机推荐</div>' +
-        '<div class="swiper-start-sub">点赞越多，越容易被推荐</div>' +
-    '</div>';
-}
-
-function startRecommendSwiper() {
+    // 直接自动打开 swiper，不需要点击提示
     initSwiper('recommend-images', fetchRecommendImages, 'recommend');
     openSwiper();
 }
