@@ -108,6 +108,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         .fab:hover { transform: scale(1.1); }
         .fab-upload { background: #4CAF50; }
         .fab-album { background: #9C27B0; }
+        .fab-feedback { background: #1976D2; width: 40px; height: 40px; font-size: 18px; }
         .fab-tooltip {
             position: absolute; right: 60px; background: rgba(0,0,0,0.75);
             color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px;
@@ -115,7 +116,43 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         }
         .fab:hover .fab-tooltip { opacity: 1; }
 
-        /* ===== 弹窗通用 ===== */
+        /* ===== 上传额度提示 ===== */
+        .upload-quota-tip {
+            border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+            font-size: 13px; line-height: 1.6; display: none;
+        }
+        .upload-quota-tip--first {
+            display: block;
+            background: #fff3e0; border: 1px solid #ffcc80; color: #e65100;
+            text-align: center;
+        }
+        .upload-quota-tip--small {
+            display: block;
+            font-size: 11px; color: #bbb; text-align: right; padding: 0 0 4px 0;
+            background: none; border: none;
+        }
+
+        /* ===== 反馈列表（管理员面板） ===== */
+        .feedback-item {
+            padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+            background: #fafafa; border: 1px solid #e0e0e0;
+            font-size: 13px; line-height: 1.6;
+        }
+        .feedback-item--unread { border-color: #90caf9; background: #e3f2fd; }
+        .feedback-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .feedback-user { color: #888; font-size: 12px; }
+        .feedback-time { color: #bbb; font-size: 11px; margin-left: auto; }
+        .feedback-body { color: #333; word-break: break-all; }
+        .feedback-mark-btn {
+            margin-top: 6px; padding: 3px 10px; font-size: 11px;
+            border: 1px solid #90caf9; border-radius: 4px; background: white;
+            color: #1976D2; cursor: pointer;
+        }
+        .feedback-mark-btn:hover { background: #e3f2fd; }
+        .feedback-read-tag { font-size: 11px; color: #aaa; background: #f0f0f0; padding: 2px 6px; border-radius: 10px; }
+        .feedback-unread-tag { font-size: 11px; color: white; background: #1976D2; padding: 2px 6px; border-radius: 10px; }
+
+
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); z-index: 200;
@@ -682,6 +719,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
                 <div id="storage-size-text" style="font-size: 11px; color: #999; margin-top: 2px;">加载中...</div>
             </div>
         </div>
+
+        <div class="whitelist-section" style="width:100%; margin-top:16px;">
+            <h4>&#128172; 用户反馈</h4>
+            <div id="feedback-list">
+                <span style="color:#999;font-size:12px;">加载中...</span>
+            </div>
+        </div>
     </div>
 
     <!-- 搜索栏 -->
@@ -844,6 +888,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     <div class="modal-overlay" id="upload-modal">
         <div class="modal-panel">
             <h3>&#128247; 上传图片</h3>
+            <!-- 额度提示（首次醒目，之后小字） -->
+            <div id="upload-quota-tip" class="upload-quota-tip"></div>
             <div class="form-group">
                 <label>选择相册（选填）</label>
                 <select id="upload-album-select">
@@ -974,6 +1020,27 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <button class="fab fab-album" onclick="openAlbumCreateModal()">
             <span class="fab-tooltip">创建相册</span>&#128218;
         </button>
+        <button class="fab fab-feedback" onclick="openFeedbackModal()">
+            <span class="fab-tooltip">意见反馈</span>&#128172;
+        </button>
+    </div>
+
+    <!-- 反馈弹窗 -->
+    <div class="modal-overlay" id="feedback-modal">
+        <div class="modal-panel" style="max-width:400px;">
+            <h3>&#128172; 意见反馈</h3>
+            <p style="font-size:13px;color:#888;margin-bottom:12px;">你的反馈将直接发送给管理员，欢迎提出建议或报告问题 &#128591;</p>
+            <div class="form-group">
+                <textarea id="feedback-content" placeholder="请写下你的建议或问题（100 字以内）" maxlength="100" rows="4"
+                    oninput="document.getElementById('feedback-char-count').textContent=this.value.length+' / 100'"
+                    style="width:100%;padding:10px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;resize:none;box-sizing:border-box;"></textarea>
+                <div id="feedback-char-count" style="text-align:right;font-size:11px;color:#bbb;margin-top:4px;">0 / 100</div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeFeedbackModal()">取消</button>
+                <button class="btn-confirm blue" id="feedback-submit-btn" onclick="submitFeedback()">提交</button>
+            </div>
+        </div>
     </div>
 
     <!-- 免责声明弹窗 -->
@@ -1517,11 +1584,74 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // ======================================
 // 懒加载（减少不必要的带宽消耗）
+// 队列加载：图片进入可视区域后排队，一张完成后再加载下一张
 // ======================================
 var lazyObserver = null;
 
 // 图片加载失败的占位图 SVG
 var BROKEN_IMAGE_SVG = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23ccc" x="50%25" y="50%25" text-anchor="middle" font-size="12">图片加载失败</text></svg>';
+
+// 加载队列
+var loadQueue = [];
+var isLoadingQueue = false;
+
+// 将图片加入队列
+function enqueueImage(imgEl) {
+    if (loadQueue.indexOf(imgEl) === -1) {
+        loadQueue.push(imgEl);
+    }
+    processQueue();
+}
+
+// 依次处理队列
+function processQueue() {
+    if (isLoadingQueue || loadQueue.length === 0) return;
+    
+    var imgEl = loadQueue.shift();
+    
+    // 元素可能已经被移除或已经有真实 src 了
+    if (!imgEl || !imgEl.dataset || !imgEl.dataset.src) {
+        processQueue();
+        return;
+    }
+    
+    isLoadingQueue = true;
+    
+    var src = imgEl.dataset.src;
+    var imageId = imgEl.dataset.imgId;
+    imgEl.dataset.src = '';
+    
+    // 带宽去重：同一图片每天只扣一次
+    if (!shouldCountBandwidthForImage(imageId, 50 * 1024)) {
+        imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
+        imgEl.style.opacity = '0.5';
+        imgEl.style.cursor = 'pointer';
+        imgEl.onclick = function() {
+            showToast('浏览额度已用完，请登录后继续');
+            setTimeout(function() { openAuthModal(); }, 500);
+        };
+        if (typeof updateBandwidthDisplay === 'function') {
+            updateBandwidthDisplay();
+        }
+        isLoadingQueue = false;
+        processQueue();
+        return;
+    }
+    
+    var tempImg = new Image();
+    tempImg.onload = function() {
+        imgEl.src = src;
+        isLoadingQueue = false;
+        processQueue();
+    };
+    tempImg.onerror = function() {
+        imgEl.src = BROKEN_IMAGE_SVG;
+        imgEl.style.cursor = 'default';
+        isLoadingQueue = false;
+        processQueue();
+    };
+    tempImg.src = src;
+}
 
 function setupLazyLoad() {
     if ('IntersectionObserver' in window) {
@@ -1529,37 +1659,10 @@ function setupLazyLoad() {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
                     var img = entry.target;
-                    if (img.dataset.src) {
-                        var imageId = img.dataset.imgId;
-                        
-                        // 带宽去重：同一图片每天只扣一次
-                        if (!shouldCountBandwidthForImage(imageId, 50 * 1024)) {
-                            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
-                            img.style.opacity = '0.5';
-                            img.style.cursor = 'pointer';
-                            img.onclick = function() { 
-                                showToast('浏览额度已用完，请登录后继续');
-                                setTimeout(function() { openAuthModal(); }, 500);
-                            };
-                            lazyObserver.unobserve(img);
-                            if (typeof updateBandwidthDisplay === 'function') {
-                                updateBandwidthDisplay();
-                            }
-                            return;
-                        }
-                        
-                        img.src = img.dataset.src;
-                        img.dataset.src = '';
-                        
-                        // 图片加载失败时显示占位图
-                        img.onerror = function() {
-                            if (img.src !== BROKEN_IMAGE_SVG) {
-                                img.src = BROKEN_IMAGE_SVG;
-                                img.style.cursor = 'default';
-                            }
-                        };
-                    }
                     lazyObserver.unobserve(img);
+                    if (img.dataset.src) {
+                        enqueueImage(img);
+                    }
                 }
             });
         }, { rootMargin: '200px' });
@@ -1572,28 +1675,10 @@ function lazyLoadImage(imgEl, src, imageId) {
         if (imageId) imgEl.dataset.imgId = imageId;
         lazyObserver.observe(imgEl);
     } else {
-        // 不支持 IntersectionObserver 的降级处理
-        var imageId2 = imageId;
-        if (!shouldCountBandwidthForImage(imageId2, 50 * 1024)) {
-            imgEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect fill="%23f0f0f0" width="200" height="150"/><text fill="%23999" x="50%25" y="50%25" text-anchor="middle" font-size="12">额度不足，请登录</text></svg>';
-            imgEl.style.opacity = '0.5';
-            imgEl.style.cursor = 'pointer';
-            imgEl.onclick = function() { 
-                showToast('浏览额度已用完，请登录后继续');
-                setTimeout(function() { openAuthModal(); }, 500);
-            };
-            if (typeof updateBandwidthDisplay === 'function') {
-                updateBandwidthDisplay();
-            }
-            return;
-        }
-        imgEl.src = src;
-        imgEl.onerror = function() {
-            if (imgEl.src !== BROKEN_IMAGE_SVG) {
-                imgEl.src = BROKEN_IMAGE_SVG;
-                imgEl.style.cursor = 'default';
-            }
-        };
+        // 不支持 IntersectionObserver 的降级处理：直接加入队列
+        imgEl.dataset.src = src;
+        if (imageId) imgEl.dataset.imgId = imageId;
+        enqueueImage(imgEl);
     }
 }
 
@@ -1816,6 +1901,7 @@ function adminLogin() {
         loadBlacklist();
         loadBandwidthStats();
         loadSupabaseQuota();
+        loadFeedbackList();
         refreshCurrentView();
     } else {
         showToast('密码错误');
@@ -2251,6 +2337,23 @@ function openUploadModal() {
     document.getElementById('file-input-image').value = '';
     document.getElementById('upload-anonymous').checked = false;
     loadAlbumOptions();
+    showUploadQuotaTip();
+}
+
+// 上传额度提示
+function showUploadQuotaTip() {
+    var tipShown = safeGet('uploadTipShown', '');
+    var tipEl = document.getElementById('upload-quota-tip');
+    if (!tipEl) return;
+
+    if (!tipShown) {
+        safeSet('uploadTipShown', 'true');
+        tipEl.innerHTML = '&#9888;&#65039; <strong>本站为免费网站</strong>，存储和带宽额度有限，<br>请尽量上传<strong>精品图片</strong>，感谢你的理解 &#128591;';
+        tipEl.className = 'upload-quota-tip upload-quota-tip--first';
+    } else {
+        tipEl.innerHTML = '&#128161; 免费网站，请传精品';
+        tipEl.className = 'upload-quota-tip upload-quota-tip--small';
+    }
 }
 
 function loadAlbumOptions() {
@@ -3532,6 +3635,112 @@ function showAuthorWorks(authorName) {
 
 
 // ======================================
+// 用户反馈功能
+// ======================================
+
+function openFeedbackModal() {
+    var modal = document.getElementById('feedback-modal');
+    if (!modal) return;
+    document.getElementById('feedback-content').value = '';
+    document.getElementById('feedback-char-count').textContent = '0 / 100';
+    document.getElementById('feedback-submit-btn').disabled = false;
+    modal.classList.add('show');
+}
+
+function closeFeedbackModal() {
+    var modal = document.getElementById('feedback-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+function submitFeedback() {
+    var content = document.getElementById('feedback-content').value.trim();
+    if (!content) {
+        showToast('请填写反馈内容');
+        return;
+    }
+    if (content.length > 100) {
+        showToast('反馈内容不能超过 100 字');
+        return;
+    }
+
+    var btn = document.getElementById('feedback-submit-btn');
+    btn.disabled = true;
+    btn.textContent = '提交中...';
+
+    var record = {
+        content: content,
+        user_id: currentUser ? currentUser.id : null,
+        is_read: false
+    };
+
+    supabaseClient.from('feedback').insert([record])
+    .then(function(result) {
+        if (result && result.error) throw result.error;
+        showToast('反馈已提交，感谢你的意见！');
+        closeFeedbackModal();
+    }).catch(function(e) {
+        showToast('提交失败：' + (e.message || '未知错误'));
+        btn.disabled = false;
+        btn.textContent = '提交';
+    });
+}
+
+// ======================================
+// 管理员查看反馈
+// ======================================
+function loadFeedbackList() {
+    var container = document.getElementById('feedback-list');
+    if (!container) return;
+    container.innerHTML = '<div style="color:#999;font-size:13px;">加载中...</div>';
+
+    supabaseClient.from('feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(function(result) {
+            if (result.error) throw result.error;
+            var list = result.data || [];
+            if (list.length === 0) {
+                container.innerHTML = '<div style="color:#999;font-size:13px;">暂无反馈</div>';
+                return;
+            }
+            var html = '';
+            list.forEach(function(item) {
+                var date = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+                var userId = item.user_id || '匿名';
+                var readClass = item.is_read ? 'feedback-item--read' : 'feedback-item--unread';
+                var readLabel = item.is_read ? '<span class="feedback-read-tag">已读</span>' : '<span class="feedback-unread-tag">未读</span>';
+                html += '<div class="feedback-item ' + readClass + '" data-id="' + item.id + '">' +
+                    '<div class="feedback-meta">' + readLabel + ' <span class="feedback-user">用户：' + escapeHtml(userId) + '</span><span class="feedback-time">' + date + '</span></div>' +
+                    '<div class="feedback-body">' + escapeHtml(item.content) + '</div>' +
+                    (item.is_read ? '' : '<button class="feedback-mark-btn" onclick="markFeedbackRead(\'' + item.id + '\', this)">标记已读</button>') +
+                    '</div>';
+            });
+            container.innerHTML = html;
+        }).catch(function(e) {
+            container.innerHTML = '<div style="color:#f44336;font-size:13px;">加载失败：' + e.message + '</div>';
+        });
+}
+
+function markFeedbackRead(feedbackId, btn) {
+    btn.disabled = true;
+    supabaseClient.from('feedback').update({ is_read: true }).eq('id', feedbackId)
+    .then(function(result) {
+        if (result && result.error) throw result.error;
+        var item = btn.closest('.feedback-item');
+        if (item) {
+            item.classList.remove('feedback-item--unread');
+            item.classList.add('feedback-item--read');
+            item.querySelector('.feedback-unread-tag').outerHTML = '<span class="feedback-read-tag">已读</span>';
+            btn.remove();
+        }
+    }).catch(function(e) {
+        showToast('操作失败：' + e.message);
+        btn.disabled = false;
+    });
+}
+
+
+// ======================================
 // 图片浏览（最新上传 + 排行榜）+ 点赞 + 删除 + 大图查看 + 无限滚动
 // ======================================
 var likedIds = JSON.parse(safeGet('likedIds', '[]'));
@@ -4142,6 +4351,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadBlacklist();
         loadBandwidthStats();
         loadSupabaseQuota();
+        loadFeedbackList();
     }
 
     // 更新带宽显示
